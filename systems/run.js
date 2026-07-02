@@ -39,7 +39,7 @@ export function createRunner(canvas, onDistance, onEnd) {
       key: creature.key, stage: creature.stage,
       x: RW * 0.35, y: groundY, vy: 0, groundY, onGround: true,
       dist: 0, speed: 2.3, obstacles: [], spawnT: 0, alive: true, t: 0,
-      bg1: 0, bg2: 0,
+      bg1: 0, bg2: 0, strideT: 0, dust: [],
     };
     if (!raf) loop();
   }
@@ -52,6 +52,17 @@ export function createRunner(canvas, onDistance, onEnd) {
 
     run.vy += 0.5; run.y += run.vy;
     if (run.y >= run.groundY) { run.y = run.groundY; run.vy = 0; run.onGround = true; }
+
+    // dust kicked up on each footfall while grounded
+    if (run.onGround) {
+      run.strideT += run.speed;
+      if (run.strideT > 22) {
+        run.strideT = 0;
+        run.dust.push({ x: run.x - 16, y: run.groundY + 38, life: 1 });
+      }
+    }
+    for (const p of run.dust) { p.x -= run.speed * 0.6; p.life -= 0.05; }
+    run.dust = run.dust.filter((p) => p.life > 0);
 
     run.spawnT -= run.speed;
     if (run.spawnT <= 0) {
@@ -102,18 +113,42 @@ export function createRunner(canvas, onDistance, onEnd) {
 
     const cd = CRITTERS[run.key];
     const grid = cd.stages[run.stage];
+    const cell = 3;
     const groundLine = run.groundY + 38;
-    const spriteH = 16 * 3;
-    const footInset = 2 * 3;
-    const lift = run.groundY - run.y; // >0 while airborne
-    const topY = groundLine - spriteH + footInset - lift;
-    drawPix(ctx, grid, PALS[cd.type], run.x - 24, topY, 3);
+    const spriteH = 16 * cell;
+    const footInset = 2 * cell;                 // empty rows under the feet
+    const footFromTop = spriteH - footInset;    // where the feet meet the ground
+    const lift = run.groundY - run.y;           // >0 while airborne
+    const grounded = lift < 1;
+
+    // Run cycle: phase advances with distance, so leg speed tracks run speed.
+    // While grounded the body bobs and squash/stretches on each footfall and
+    // leans into the stride; airborne it holds a forward leap pose.
+    const phase = run.dist * 0.5;
+    const bob = grounded ? Math.abs(Math.sin(phase)) * 4 : 0;
+    const squash = grounded ? Math.sin(phase * 2) * 0.07 : 0;
+    const lean = grounded ? Math.sin(phase) * 0.05 : 0.14;
+
+    // dust puffs behind the feet
+    for (const p of run.dust) {
+      const s = 3 + (1 - p.life) * 5;
+      ctx.fillStyle = `rgba(250,248,240,${0.45 * p.life})`;
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+    }
 
     const shScale = Math.max(0.4, 1 - lift / 120);
     ctx.fillStyle = `rgba(0,0,0,${0.18 * shScale})`;
     ctx.beginPath();
     ctx.ellipse(run.x, groundLine, 18 * shScale, 5 * shScale, 0, 0, 6.28);
     ctx.fill();
+
+    // draw the sprite around a pivot at its feet so squash/lean look natural
+    ctx.save();
+    ctx.translate(run.x, groundLine - lift - bob);
+    ctx.rotate(lean);
+    ctx.scale(1 + squash * 0.4, 1 - squash);
+    drawPix(ctx, grid, PALS[cd.type], -24, -footFromTop, cell);
+    ctx.restore();
   }
 
   function end() {

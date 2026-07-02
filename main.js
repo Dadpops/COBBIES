@@ -68,7 +68,7 @@ function submitName() {
 let dialogueTimer = 0;
 function scheduleDialogue() {
   clearTimeout(dialogueTimer);
-  showDialogue();
+  if (!runActive) showDialogue();
   dialogueTimer = setTimeout(scheduleDialogue, 9000);
 }
 function showDialogue() {
@@ -96,6 +96,7 @@ $('playbtn').addEventListener('click', () => {
 $('rosterBack').addEventListener('click', () => $('rosterScreen').classList.remove('show'));
 
 let activeRunIdx = -1;
+let runActive = false;
 function startRun(idx) {
   activeRunIdx = idx;
   const r = state.roster[idx];
@@ -103,6 +104,9 @@ function startRun(idx) {
   $('run').style.display = 'block';
   $('runhud').classList.add('show');
   $('farmbtns').style.display = 'none';
+  document.querySelector('.topbar').style.display = 'none';
+  $('dialogue').classList.remove('show');
+  runActive = true;
   $('runnerName').textContent = displayName(r);
   runner.start({ key: r.key, stage: r.stage });
 }
@@ -144,6 +148,8 @@ $('resContinue').addEventListener('click', () => {
   $('run').style.display = 'none';
   $('runhud').classList.remove('show');
   $('farmbtns').style.display = 'flex';
+  document.querySelector('.topbar').style.display = '';
+  runActive = false;
   runner.stop();
   if (pendingEvolve) {
     showEvolution(pendingEvolve);
