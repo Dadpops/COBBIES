@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRITTER RANCH</title>
+<style>
+  :root{
+    --sky1:#8ad0e8; --sky2:#c8ecf0; --grass1:#6cc47a; --grass2:#4fa85f;
+    --dirt:#b88a5a; --ink:#2a2418; --card:#fff8e8; --line:#d8c8a0;
+    --accent:#f0954a; --xp:#7ab8ff; --paper:#fffdf6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#8ad0e8;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;color:var(--ink);
+    -webkit-user-select:none;user-select:none;touch-action:manipulation}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  #app{max-width:480px;margin:0 auto;height:100%;position:relative;overflow:hidden}
+  canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+
+  /* ---- shared UI chrome ---- */
+  .topbar{position:absolute;top:0;left:0;right:0;padding:12px 16px;z-index:10;
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(180deg,rgba(0,0,0,.18),transparent)}
+  .title{font-size:12px;letter-spacing:.28em;color:#fff;font-weight:700;
+    text-shadow:1px 1px 0 rgba(0,0,0,.3)}
+  .pill{background:var(--card);border:2px solid var(--line);border-radius:20px;
+    padding:5px 12px;font-size:10px;letter-spacing:.1em;box-shadow:2px 2px 0 rgba(0,0,0,.15)}
+
+  .btn{background:var(--accent);border:none;border-bottom:4px solid #c26a28;
+    border-radius:12px;padding:14px 30px;font-family:inherit;font-size:12px;
+    letter-spacing:.16em;color:#fff;font-weight:700;cursor:pointer;
+    text-shadow:1px 1px 0 rgba(0,0,0,.2);transition:transform .08s}
+  .btn:active{transform:translateY(2px);border-bottom-width:2px}
+  .btn.sec{background:#7ab8ff;border-bottom-color:#4a88cf}
+
+  /* ---- farm action buttons ---- */
+  #farmbtns{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));
+    left:0;right:0;display:flex;gap:12px;justify-content:center;z-index:10}
+  #farmbtns .btn:active{transform:translateY(2px)}
+  #hatchbtn:disabled{background:#b0b0b0;border-bottom-color:#808080;
+    opacity:.7;cursor:not-allowed}
+
+  /* ---- hatch overlay ---- */
+  #hatch{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;padding:34px;text-align:center;
+    background:radial-gradient(circle at 50% 42%,rgba(40,30,60,.9),rgba(16,10,26,.97))}
+  #hatch.show{display:flex;animation:fade .4s ease}
+  #hatch .htitle{font-size:13px;letter-spacing:.24em;color:#ffd98a;font-weight:700}
+  #eggwrap{width:130px;height:150px;display:flex;align-items:center;justify-content:center}
+  #eggCanvas{width:120px;height:140px;image-rendering:pixelated}
+  #eggCanvas.shake{animation:shake .28s ease infinite}
+  @keyframes shake{0%,100%{transform:translateX(0) rotate(0)}
+    25%{transform:translateX(-4px) rotate(-4deg)}75%{transform:translateX(4px) rotate(4deg)}}
+  #hatchReveal{display:none;flex-direction:column;align-items:center;gap:12px}
+  #hatchReveal.show{display:flex;animation:pop .5s ease}
+  #hatchReveal canvas{width:96px;height:96px;image-rendering:pixelated}
+  #hatchReveal .hname{font-size:13px;letter-spacing:.1em;color:#fff;font-weight:700}
+  #hatchReveal .hnew{font-size:9px;letter-spacing:.16em;color:#6ce8c0;font-weight:700}
+  #hatchReveal .hdupe{font-size:9px;letter-spacing:.12em;color:#ffb84a}
+
+  /* ---- roster overlay ---- */
+  .screen{position:absolute;inset:0;z-index:20;display:none;flex-direction:column;
+    background:linear-gradient(180deg,#2a3a4a,#1a2430)}
+  .screen.show{display:flex;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .screen h2{color:#fff;text-align:center;font-size:13px;letter-spacing:.2em;
+    padding:22px 0 6px}
+  .screen .sub{color:#9ab;text-align:center;font-size:9px;letter-spacing:.12em;padding-bottom:16px}
+  #roster{flex:1;overflow-y:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+  .rcard{background:var(--paper);border:3px solid var(--line);border-radius:14px;
+    padding:12px;display:flex;align-items:center;gap:14px;cursor:pointer;
+    box-shadow:3px 3px 0 rgba(0,0,0,.2);transition:transform .1s}
+  .rcard:active{transform:scale(.98)}
+  .rcard canvas{position:static;width:64px;height:64px;flex-shrink:0}
+  .rinfo{flex:1}
+  .rname{font-size:12px;letter-spacing:.08em;font-weight:700}
+  .rmeta{font-size:9px;color:#8a7a5a;letter-spacing:.06em;margin-top:3px}
+  .xpbar{height:7px;background:#e0d4b8;border-radius:4px;overflow:hidden;margin-top:7px}
+  .xpfill{height:100%;background:var(--xp);border-radius:4px;transition:width .5s}
+  .rgo{font-size:9px;letter-spacing:.14em;color:var(--accent);font-weight:700}
+  .backbtn{position:absolute;top:16px;left:16px;background:rgba(255,255,255,.15);
+    border:none;color:#fff;font-family:inherit;font-size:16px;width:34px;height:34px;
+    border-radius:10px;cursor:pointer;z-index:2}
+
+  /* ---- run HUD ---- */
+  #runhud{position:absolute;top:0;left:0;right:0;padding:14px 18px;z-index:10;
+    display:none;justify-content:space-between;align-items:center}
+  #runhud.show{display:flex}
+  .hud-dist{background:rgba(0,0,0,.35);border-radius:20px;padding:6px 14px;
+    color:#fff;font-size:12px;letter-spacing:.1em;font-weight:700}
+  .hud-lbl{font-size:8px;letter-spacing:.14em;color:#cde;display:block;text-align:center}
+
+  /* ---- results ---- */
+  #results{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;padding:34px;text-align:center;
+    background:rgba(20,26,34,.94)}
+  #results.show{display:flex;animation:fade .4s ease}
+  #results .big{font-size:15px;letter-spacing:.24em;color:var(--accent);font-weight:700}
+  #results .rc{background:var(--paper);border:3px solid var(--line);border-radius:16px;
+    padding:18px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.3);min-width:230px}
+  #results canvas{position:static;width:72px;height:72px}
+  #results .line{font-size:11px;letter-spacing:.06em}
+  #results .gain{color:#3a8f4a;font-weight:700}
+  .evolve-tag{background:#ffd98a;border:2px solid var(--accent);border-radius:10px;
+    padding:5px 12px;font-size:10px;letter-spacing:.1em;color:#a05a20;font-weight:700;
+    animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- FARM -->
+  <canvas id="farm"></canvas>
+  <div class="topbar">
+    <span class="title">CRITTER RANCH</span>
+    <span class="pill" id="coinPill">🪙 <b id="coinCount">40</b></span>
+  </div>
+  <div id="farmbtns">
+    <button class="btn sec" id="hatchbtn">🥚 HATCH · 50</button>
+    <button class="btn" id="playbtn">▶ PLAY</button>
+  </div>
+
+  <!-- ROSTER SELECT -->
+  <div class="screen" id="rosterScreen">
+    <button class="backbtn" id="rosterBack">‹</button>
+    <h2>CHOOSE YOUR RUNNER</h2>
+    <div class="sub">FARTHER = MORE XP · ONE HIT ENDS THE RUN</div>
+    <div id="roster"></div>
+  </div>
+
+  <!-- RUN -->
+  <canvas id="run" style="display:none"></canvas>
+  <div id="runhud">
+    <div class="hud-dist"><span class="hud-lbl">DISTANCE</span><span id="dist">0</span></div>
+    <div class="hud-dist"><span class="hud-lbl">RUNNER</span><span id="runnerName">—</span></div>
+  </div>
+
+  <!-- HATCH -->
+  <div id="hatch">
+    <div class="htitle" id="hatchTitle">HATCHING...</div>
+    <div id="eggwrap"><canvas id="eggCanvas" width="60" height="70"></canvas></div>
+    <div id="hatchReveal">
+      <canvas id="hatchCanvas" width="96" height="96"></canvas>
+      <div class="hname" id="hatchName">—</div>
+      <div class="hnew" id="hatchTag"></div>
+    </div>
+    <button class="btn" id="hatchDone" style="display:none">ADD TO RANCH</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="big" id="resTitle">RUN COMPLETE</div>
+    <div class="rc">
+      <canvas id="resCanvas" width="96" height="96"></canvas>
+      <div class="line" id="resName">—</div>
+      <div class="line">Distance <b id="resDist">0</b>m</div>
+      <div class="line gain" id="resXP">+0 XP</div>
+      <div class="line" style="color:#c8a030;font-weight:700" id="resCoins">+0 🪙</div>
+      <div id="resEvolve"></div>
+    </div>
+    <button class="btn sec" id="resContinue">BACK TO RANCH</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CRITTER RANCH — demo of the collect / grow / run loop.
+
+   PRODUCT INTENT:
+   The run is an XP faucet. The RETENTION lives in the farm +
+   growth: seeing your critters idle at home, banking XP, and
+   watching them evolve. This demo exists to prove ONE thing:
+   the loop closes and feels rewarding —
+     farm -> pick roster -> run (dist=XP) -> return with growth.
+   Everything else (more creatures, shop, breeding) is post-demo.
+   ============================================================ */
+
+/* ---------- CREATURE DATA ----------
+   Each critter has evolution stages (sprite grids) + palette.
+   XP thresholds trigger evolution. This is the growth spine. */
+
+const PALS = {
+  pup:  [null,"#3a2a1a","#c88a4a","#e8b06a","#fff0d0","#2a1a10","#ff9b9b","#ffffff"],
+  frog: [null,"#1a3a1a","#4a9a4a","#6cc46a","#c0f0a0","#0a1a0a","#ffcf5a","#ffffff"],
+  cat:  [null,"#2a2438","#6a5a8a","#9a86b8","#d8c8f0","#12101a","#ff9bcf","#ffffff"],
+  bird: [null,"#7a4a1a","#f0a84a","#ffd06a","#fff0c0","#ff5a3a","#3a2410","#ffb84a","#ffffff"],
+  slime:[null,"#1a5a4a","#3ac49a","#6ce8c0","#c0fff0","#8affe8","#0a2a20","#ff9bcf","#c8fff8"],
+};
+
+// each creature: 3 stages, 16x16 grids
+const CRITTERS = {
+  pup: {
+    name:"BISCUIT", type:"pup",
+    stages:[
+      // stage 0 — pup
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,5,5,0,0,0,0,0,0,5,5,0,0,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,2,3,2,5,5,5,5,2,3,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,7,2,2,2,2,7,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,6,4,4,6,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,5,2,5,0,0,0,0,5,2,5,0,0,0],
+        [0,0,0,5,5,0,0,0,0,0,0,5,5,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      // stage 1 — dog (bigger ears, taller)
+      [
+        [0,0,0,5,5,0,0,0,0,0,0,5,5,0,0,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,2,2,2,5,0,0,5,2,2,2,5,0,0],
+        [0,0,5,2,3,2,2,5,5,2,2,3,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,7,2,2,2,2,7,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,6,4,4,6,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,5,2,5,0,0,0,0,5,2,5,0,0,0],
+        [0,0,0,5,5,0,0,0,0,0,0,5,5,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      // stage 2 — guardian (crown accent, regal)
+      [
+        [0,0,0,0,7,0,0,7,7,0,0,7,0,0,0,0],
+        [0,0,0,5,5,5,0,0,0,0,5,5,5,0,0,0],
+        [0,0,5,2,2,2,5,0,0,5,2,2,2,5,0,0],
+        [0,0,5,2,3,2,2,5,5,2,2,3,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,0,5,2,7,2,2,2,2,7,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,2,2,6,6,2,2,2,2,5,0,0],
+        [0,0,5,2,2,2,6,4,4,6,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,6,6,2,2,2,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,5,5,0,0,0,0,0,0,5,5,5,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+    ],
+    stageNames:["PUP","HOUND","GUARDIAN"],
+  },
+  frog: {
+    name:"LILY", type:"frog",
+    stages:[
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,5,5,0,0,0,0,5,5,0,0,0,0],
+        [0,0,0,5,7,7,5,0,0,5,7,7,5,0,0,0],
+        [0,0,0,5,4,4,5,0,0,5,4,4,5,0,0,0],
+        [0,0,5,2,2,2,2,5,5,2,2,2,2,5,0,0],
+        [0,0,5,2,3,2,2,2,2,2,2,3,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,6,6,6,6,6,6,2,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,3,2,2,2,2,3,5,0,0,0,0],
+        [0,0,0,5,5,2,2,2,2,2,2,5,5,0,0,0],
+        [0,0,5,2,5,5,0,0,0,0,5,5,2,5,0,0],
+        [0,0,5,5,0,0,0,0,0,0,0,0,5,5,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,0,5,5,0,0,0,0,5,5,0,0,0,0],
+        [0,0,0,5,7,7,5,0,0,5,7,7,5,0,0,0],
+        [0,0,0,5,4,7,5,0,0,5,7,4,5,0,0,0],
+        [0,0,5,2,2,2,2,5,5,2,2,2,2,5,0,0],
+        [0,0,5,2,3,2,2,2,2,2,2,3,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,6,6,6,6,6,6,2,2,5,0,0],
+        [0,0,5,3,2,2,2,2,2,2,2,2,3,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,5,2,2,2,2,2,2,2,2,5,5,0,0],
+        [0,0,5,2,5,5,0,0,0,0,5,5,2,5,0,0],
+        [0,0,5,2,5,0,0,0,0,0,0,5,2,5,0,0],
+        [0,0,5,5,0,0,0,0,0,0,0,0,5,5,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,7,0,5,5,0,0,0,0,5,5,0,7,0,0],
+        [0,7,4,7,7,7,5,0,0,5,7,7,7,4,7,0],
+        [0,0,7,5,4,7,5,0,0,5,7,4,5,7,0,0],
+        [0,0,5,2,2,2,2,5,5,2,2,2,2,5,0,0],
+        [0,0,5,2,3,2,2,2,2,2,2,3,2,5,0,0],
+        [0,0,5,2,2,2,8,2,2,8,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,6,6,6,6,6,6,2,2,5,0,0],
+        [0,0,5,3,2,2,2,2,2,2,2,2,3,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,5,2,2,2,2,2,2,2,2,5,5,0,0],
+        [0,0,5,2,5,5,0,0,0,0,5,5,2,5,0,0],
+        [0,0,5,5,0,0,0,0,0,0,0,0,5,5,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+    ],
+    stageNames:["TADLING","FROG","ORACLE"],
+  },
+  cat: {
+    name:"MIDNIGHT", type:"cat",
+    stages:[
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,5,0,0,0,0,0,0,0,0,5,0,0,0],
+        [0,0,5,2,5,0,0,0,0,0,0,5,2,5,0,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,2,2,2,5,5,5,5,2,2,2,5,0,0],
+        [0,0,0,5,2,7,2,2,2,2,7,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,4,0,0,0],
+        [0,0,0,5,2,5,0,0,0,5,2,5,4,0,0,0],
+        [0,0,0,5,5,0,0,0,0,0,5,5,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,5,0,0,0,0,0,0,0,0,5,0,0,0],
+        [0,0,5,2,5,0,0,0,0,0,0,5,2,5,0,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,2,3,2,5,5,5,5,2,3,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,0,5,2,7,2,2,2,2,7,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,4,4,0,0],
+        [0,0,0,0,5,2,2,2,2,2,2,5,0,4,0,0],
+        [0,0,0,5,2,5,0,0,0,5,2,5,0,0,0,0],
+        [0,0,0,5,5,0,0,0,0,0,5,5,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,7,5,0,0,0,0,0,0,0,0,5,7,0,0],
+        [0,7,4,2,5,0,0,0,0,0,0,5,2,4,7,0],
+        [0,0,5,2,2,5,0,0,0,0,5,2,2,5,0,0],
+        [0,0,5,2,3,2,5,5,5,5,2,3,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,8,2,2,2,2,2,2,8,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,4,4,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,4,0],
+        [0,0,0,5,2,5,0,0,0,5,2,5,0,4,0,0],
+        [0,0,0,5,5,0,0,0,0,0,5,5,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+    ],
+    stageNames:["KITTEN","PROWLER","SHADE"],
+  },
+  bird: {
+    name:"PIP", type:"bird",
+    stages:[
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0],
+        [0,0,0,0,0,5,2,2,2,2,5,0,0,0,0,0],
+        [0,0,0,0,5,2,3,2,2,3,2,5,0,0,0,0],
+        [0,0,0,0,5,2,7,2,2,7,2,5,0,0,0,0],
+        [0,0,0,6,6,2,2,6,6,2,2,2,5,0,0,0],
+        [0,0,0,0,6,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,5,2,2,2,2,5,5,0,0,0,0],
+        [0,0,0,0,0,0,7,0,0,7,0,0,0,0,0,0],
+        [0,0,0,0,0,0,7,0,0,7,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0],
+        [0,0,0,0,0,5,2,2,2,2,5,0,0,0,0,0],
+        [0,0,0,0,5,2,3,2,2,3,2,5,0,0,0,0],
+        [0,0,0,0,5,2,7,2,2,7,2,5,0,0,0,0],
+        [0,0,6,6,6,2,2,6,6,2,2,2,5,0,0,0],
+        [0,6,6,2,6,2,2,2,2,2,2,5,0,0,0,0],
+        [0,0,6,2,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,5,2,2,2,2,5,5,0,0,0,0],
+        [0,0,0,0,0,0,7,7,7,7,0,0,0,0,0,0],
+        [0,0,0,0,0,7,0,0,0,0,7,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,0,4,0,5,5,5,5,0,4,0,0,0,0],
+        [0,0,0,4,0,5,2,2,2,2,5,0,4,0,0,0],
+        [0,0,0,0,5,2,3,2,2,3,2,5,0,0,0,0],
+        [0,0,0,0,5,2,8,2,2,8,2,5,0,0,0,0],
+        [0,6,6,6,6,2,2,6,6,2,2,2,5,0,0,0],
+        [6,6,2,2,6,2,2,2,2,2,2,5,4,0,0,0],
+        [0,6,2,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,6,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [6,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,0,0,5,5,2,2,2,2,5,5,0,0,0,0],
+        [0,0,0,4,0,7,7,7,7,7,7,0,4,0,0,0],
+        [0,0,4,0,7,0,0,0,0,0,0,7,0,4,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+    ],
+    stageNames:["CHICK","SPARROW","PHOENIX"],
+  },
+  slime: {
+    name:"BLOB", type:"slime",
+    stages:[
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0],
+        [0,0,0,0,5,5,2,2,2,2,5,5,0,0,0,0],
+        [0,0,0,5,2,2,4,2,2,4,2,2,5,0,0,0],
+        [0,0,5,2,2,2,2,2,2,2,2,2,2,5,0,0],
+        [0,0,5,2,7,2,2,2,2,2,2,7,2,5,0,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,2,2,2,2,6,6,6,6,2,2,2,2,5,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0],
+        [0,0,0,0,5,5,2,2,2,2,5,5,0,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,4,2,2,2,2,4,2,2,5,0,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,2,7,2,2,2,2,2,2,2,2,7,2,5,0],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [5,2,2,2,2,2,6,6,6,6,2,2,2,2,2,5],
+        [5,2,2,2,2,6,4,4,4,4,6,2,2,2,2,5],
+        [5,2,2,2,2,2,6,6,6,6,2,2,2,2,2,5],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+      [
+        [0,0,0,0,0,8,0,0,0,0,8,0,0,0,0,0],
+        [0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0],
+        [0,0,0,8,5,5,2,2,2,2,5,5,8,0,0,0],
+        [0,0,0,5,2,2,2,2,2,2,2,2,5,0,0,0],
+        [0,0,5,2,2,4,2,2,2,2,4,2,2,5,0,0],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,2,8,2,2,2,2,2,2,2,2,8,2,5,0],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [5,2,2,2,2,2,6,6,6,6,2,2,2,2,2,5],
+        [5,2,2,2,2,6,4,8,8,4,6,2,2,2,2,5],
+        [5,2,2,2,2,2,6,6,6,6,2,2,2,2,2,5],
+        [5,2,8,2,2,2,2,2,2,2,2,2,2,8,2,5],
+        [5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,5],
+        [0,5,2,2,2,2,2,2,2,2,2,2,2,2,5,0],
+        [0,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      ],
+    ],
+    stageNames:["DROPLET","SLIME","CORE"],
+  },
+};
+
+// XP thresholds for evolution
+const EVO_XP=[0, 120, 320]; // stage 0 default, ->1 at 120, ->2 at 320
+
+/* ---------- ROSTER STATE (the persistent growth) ---------- */
+let roster = [
+  {key:"pup",  xp:60,  stage:0},
+  {key:"frog", xp:30,  stage:0},
+  {key:"cat",  xp:95,  stage:0},
+];
+function stageFor(xp){ let s=0; for(let i=0;i<EVO_XP.length;i++) if(xp>=EVO_XP[i]) s=i; return s; }
+roster.forEach(r=>r.stage=stageFor(r.xp));
+
+/* ---------- COIN ECONOMY + HATCH POOL ----------
+   Coins are the roster-expansion currency (distinct from XP,
+   which grows individuals). Runs pay coins by distance, same
+   faucet as XP. An egg is priced so it costs ~2 solid runs,
+   giving the collection loop a deliberate pace. The pool is
+   every species; a hatch is a random pull (duplicates allowed,
+   which in a full build would convert to XP or shards). */
+let coins = 40;
+const EGG_COST = 50;
+const HATCH_POOL = ["pup","frog","cat","bird","slime"];
+
+/* ---------- PIXEL DRAW HELPER ---------- */
+function drawPix(ctx,grid,pal,ox,oy,cell){
+  for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++){
+    const id=grid[y][x];if(!id)continue;pal[id]&&(ctx.fillStyle=pal[id],
+      ctx.fillRect(ox+x*cell,oy+y*cell,cell,cell));
+  }
+}
+
+/* ============================================================
+   FARM SCENE — 2.5D isometric tiles + critters idle-walking.
+   This is the "home" that makes growth feel like it matters.
+   ============================================================ */
+const farmC=document.getElementById("farm"), fctx=farmC.getContext("2d");
+let FW,FH;
+function farmResize(){const r=farmC.getBoundingClientRect();farmC.width=r.width;farmC.height=r.height;FW=farmC.width;FH=farmC.height;}
+window.addEventListener("resize",()=>{farmResize();runResize();});
+
+// isometric tile
+function isoTile(cx,cy,top,left,right,tw,td){
+  fctx.fillStyle=top;
+  fctx.beginPath();fctx.moveTo(cx,cy);fctx.lineTo(cx+tw,cy+td);
+  fctx.lineTo(cx,cy+td*2);fctx.lineTo(cx-tw,cy+td);fctx.closePath();fctx.fill();
+  fctx.fillStyle=left;
+  fctx.beginPath();fctx.moveTo(cx-tw,cy+td);fctx.lineTo(cx,cy+td*2);
+  fctx.lineTo(cx,cy+td*2+6);fctx.lineTo(cx-tw,cy+td+6);fctx.closePath();fctx.fill();
+  fctx.fillStyle=right;
+  fctx.beginPath();fctx.moveTo(cx+tw,cy+td);fctx.lineTo(cx,cy+td*2);
+  fctx.lineTo(cx,cy+td*2+6);fctx.lineTo(cx+tw,cy+td+6);fctx.closePath();fctx.fill();
+}
+
+// wandering critters on farm
+let wanderers=[];
+function initWanderers(){
+  wanderers=roster.map((r,i)=>({
+    key:r.key, stage:r.stage,
+    x:0.3+0.2*i, y:0.55+0.08*(i%2),
+    tx:Math.random(), ty:Math.random()*0.3+0.5,
+    ph:Math.random()*6.28, flip:1,
+  }));
+}
+let ft=0;
+function drawFarm(){
+  ft+=0.016;
+  // sky gradient
+  const g=fctx.createLinearGradient(0,0,0,FH);
+  g.addColorStop(0,"#8ad0e8");g.addColorStop(.55,"#c8ecf0");g.addColorStop(.56,"#7ec86a");g.addColorStop(1,"#4fa85f");
+  fctx.fillStyle=g;fctx.fillRect(0,0,FW,FH);
+
+  // a couple clouds
+  fctx.fillStyle="rgba(255,255,255,.7)";
+  const cl=(ft*8)%(FW+80)-40;
+  fctx.fillRect(cl,50,44,10);fctx.fillRect(cl+8,42,28,10);
+  fctx.fillRect(FW-cl*0.6,80,36,8);fctx.fillRect(FW-cl*0.6+6,73,22,8);
+
+  // iso ground grid (the 2.5D tile style)
+  const originY=FH*0.5, tw=34, td=17, cols=5, rows=4;
+  const cx0=FW/2;
+  for(let r=0;r<rows;r++)for(let cIdx=0;cIdx<cols;cIdx++){
+    const cx=cx0+(cIdx-r)*tw;
+    const cy=originY+(cIdx+r)*td - td*3;
+    const alt=(r+cIdx)%2;
+    isoTile(cx,cy, alt?"#7ac86a":"#6cbe5e", alt?"#4a9a4a":"#3f8f3f",
+            alt?"#3f8f3f":"#357f37", tw,td);
+  }
+
+  // a barn accent (simple)
+  drawBarn(cx0+tw*2.1, originY-6);
+
+  // critters wandering (sorted by y for depth)
+  const sorted=[...wanderers].sort((a,b)=>a.y-b.y);
+  sorted.forEach(w=>{
+    // ease toward target, pick new target when close
+    w.x+=(w.tx-w.x)*0.008; w.y+=(w.ty-w.y)*0.008;
+    if(Math.hypot(w.tx-w.x,w.ty-w.y)<0.02){w.tx=0.2+Math.random()*0.6;w.ty=0.5+Math.random()*0.28;w.flip=w.tx>w.x?1:-1;}
+    const px=w.x*FW, py=w.y*FH;
+    const bob=Math.abs(Math.sin(ft*4+w.ph))*3;
+    // shadow
+    fctx.fillStyle="rgba(0,0,0,.18)";
+    fctx.beginPath();fctx.ellipse(px,py+2,16,6,0,0,6.28);fctx.fill();
+    // sprite
+    const grid=CRITTERS[w.key].stages[w.stage];
+    drawPix(fctx,grid,PALS[CRITTERS[w.key].type],px-24,py-40-bob,3);
+  });
+  requestAnimationFrame(drawFarm);
+}
+function drawBarn(x,y){
+  fctx.fillStyle="#c0503a";fctx.fillRect(x-22,y,44,30);
+  fctx.fillStyle="#a03a2a";fctx.beginPath();fctx.moveTo(x-26,y);fctx.lineTo(x,y-18);fctx.lineTo(x+26,y);fctx.closePath();fctx.fill();
+  fctx.fillStyle="#7a2a1e";fctx.fillRect(x-7,y+12,14,18);
+  fctx.fillStyle="#e8c86a";fctx.fillRect(x-3,y+3,6,6);
+}
+
+/* ---------- COIN DISPLAY ---------- */
+function syncCoins(){
+  document.getElementById("coinCount").textContent=coins;
+  const hb=document.getElementById("hatchbtn");
+  hb.disabled = coins<EGG_COST;
+}
+
+/* ============================================================
+   EGG HATCH — the roster-expansion loop.
+   Spend coins, shake an egg, reveal a random critter from the
+   pool. New species join the ranch; duplicates (in this demo)
+   just award a small XP boost to the existing one so a pull is
+   never a dead loss — a deliberate anti-frustration choice.
+   ============================================================ */
+// simple pixel egg, drawn with a wobble crack near hatch
+const EGG_PAL=[null,"#c8a86a","#f0e0c0","#fff8e8","#a88a4a","#8a6a3a"];
+function eggGrid(cracked){
+  const g=[
+    [0,0,0,3,3,3,0,0,0,0],
+    [0,0,3,2,2,2,3,0,0,0],
+    [0,3,2,2,2,2,2,3,0,0],
+    [0,3,2,2,2,2,2,3,0,0],
+    [3,2,2,2,2,2,2,2,3,0],
+    [3,2,2,2,2,2,2,2,3,0],
+    [3,1,2,2,2,2,2,1,3,0],
+    [3,1,1,2,2,2,1,1,3,0],
+    [0,3,1,1,1,1,1,3,0,0],
+    [0,0,3,4,4,4,3,0,0,0],
+  ];
+  if(cracked){ g[4][4]=5; g[5][3]=5; g[5][5]=5; g[6][4]=5; }
+  return g;
+}
+function drawEgg(cracked){
+  const ec=document.getElementById("eggCanvas"), c=ec.getContext("2d");
+  c.clearRect(0,0,ec.width,ec.height);
+  drawPix(c,eggGrid(cracked),EGG_PAL,0,0,6);
+}
+
+const hatchOverlay=document.getElementById("hatch");
+document.getElementById("hatchbtn").addEventListener("click",doHatch);
+
+function doHatch(){
+  if(coins<EGG_COST)return;
+  coins-=EGG_COST; syncCoins();
+  // reset overlay state
+  document.getElementById("hatchTitle").textContent="HATCHING...";
+  document.getElementById("hatchReveal").classList.remove("show");
+  document.getElementById("hatchDone").style.display="none";
+  const eggCanvas=document.getElementById("eggCanvas");
+  eggCanvas.style.display="block"; drawEgg(false);
+  hatchOverlay.classList.add("show");
+  // shake, then reveal
+  setTimeout(()=>eggCanvas.classList.add("shake"),400);
+  setTimeout(()=>drawEgg(true),1500);
+  setTimeout(()=>{ eggCanvas.classList.remove("shake"); reveal(); },2300);
+}
+
+function reveal(){
+  const key=HATCH_POOL[(Math.random()*HATCH_POOL.length)|0];
+  const cd=CRITTERS[key];
+  const owned=roster.find(r=>r.key===key);
+  document.getElementById("eggCanvas").style.display="none";
+  const rv=document.getElementById("hatchReveal");
+  const rc=document.getElementById("hatchCanvas").getContext("2d");
+  rc.clearRect(0,0,96,96);
+  // center: 16-wide grid * 3px = 48; (96-48)/2 = 24 offset
+  drawPix(rc,cd.stages[0],PALS[cd.type],24,24,3);
+  document.getElementById("hatchTitle").textContent="IT HATCHED!";
+  document.getElementById("hatchName").textContent=cd.name;
+  const tag=document.getElementById("hatchTag");
+  if(owned){
+    owned.xp+=40; owned.stage=stageFor(owned.xp);
+    const w=wanderers.find(w=>w.key===key); if(w)w.stage=owned.stage;
+    tag.className="hdupe"; tag.textContent="DUPLICATE · +40 XP TO "+cd.name;
+  }else{
+    roster.push({key, xp:0, stage:0});
+    wanderers.push({key, stage:0, x:0.5,y:0.6, tx:Math.random(),
+      ty:0.5+Math.random()*0.28, ph:Math.random()*6.28, flip:1});
+    tag.className="hnew"; tag.textContent="NEW CRITTER JOINS THE RANCH!";
+  }
+  rv.classList.add("show");
+  document.getElementById("hatchDone").style.display="block";
+}
+document.getElementById("hatchDone").addEventListener("click",()=>{
+  hatchOverlay.classList.remove("show");
+});
+
+/* ============================================================
+   ROSTER SELECT
+   ============================================================ */
+const rosterScreen=document.getElementById("rosterScreen");
+document.getElementById("playbtn").addEventListener("click",openRoster);
+document.getElementById("rosterBack").addEventListener("click",()=>rosterScreen.classList.remove("show"));
+
+function openRoster(){
+  const list=document.getElementById("roster"); list.innerHTML="";
+  roster.forEach((r,i)=>{
+    const cd=CRITTERS[r.key];
+    const nextXP=EVO_XP[Math.min(r.stage+1,EVO_XP.length-1)];
+    const prevXP=EVO_XP[r.stage];
+    const pct = r.stage>=EVO_XP.length-1 ? 100 :
+      Math.round(((r.xp-prevXP)/(nextXP-prevXP))*100);
+    const card=document.createElement("div");
+    card.className="rcard";
+    card.innerHTML=`<canvas width="48" height="48"></canvas>
+      <div class="rinfo">
+        <div class="rname">${cd.name}</div>
+        <div class="rmeta">${cd.stageNames[r.stage]} · LVL ${r.stage+1} · ${r.xp} XP</div>
+        <div class="xpbar"><div class="xpfill" style="width:${pct}%"></div></div>
+      </div><div class="rgo">RUN ›</div>`;
+    list.appendChild(card);
+    const cc=card.querySelector("canvas").getContext("2d");
+    drawPix(cc,cd.stages[r.stage],PALS[cd.type],0,0,3);
+    card.addEventListener("click",()=>startRun(i));
+  });
+  rosterScreen.classList.add("show");
+}
+
+/* ============================================================
+   THE RUN — one-button endless runner. Tap to jump.
+   Distance -> XP. One hit ends it. Speed ramps (escalatable).
+   ============================================================ */
+const runC=document.getElementById("run"), rctx=runC.getContext("2d");
+let RW,RH;
+function runResize(){const r=runC.getBoundingClientRect();runC.width=r.width;runC.height=r.height;RW=runC.width;RH=runC.height;}
+let run=null;
+
+function startRun(rosterIdx){
+  rosterScreen.classList.remove("show");
+  runC.style.display="block";
+  document.getElementById("runhud").classList.add("show");
+  document.getElementById("playbtn").style.display="none";
+  runResize();
+  const r=roster[rosterIdx], cd=CRITTERS[r.key];
+  document.getElementById("runnerName").textContent=cd.name;
+  const groundY=RH*0.72;
+  run={
+    idx:rosterIdx, key:r.key, stage:r.stage,
+    x:RW*0.35, y:groundY, vy:0, groundY, onGround:true,
+    dist:0, speed:2.3, obstacles:[], spawnT:0, alive:true, t:0,
+    // parallax bg offsets
+    bg1:0, bg2:0,
+  };
+  requestAnimationFrame(runLoop);
+}
+function jump(){
+  if(!run||!run.alive)return;
+  if(run.onGround){run.vy=-9.4; run.onGround=false;}
+}
+runC.addEventListener("pointerdown",jump);
+
+function runLoop(){
+  if(!run)return;
+  run.t+=0.016;
+  // gentle escalation: slow ramp, capped so it stays playable.
+  if(run.speed<6.5) run.speed+=0.0006;
+  run.dist+=run.speed*0.5;
+  // physics
+  run.vy+=0.5; run.y+=run.vy;
+  if(run.y>=run.groundY){run.y=run.groundY;run.vy=0;run.onGround=true;}
+  // spawn obstacles
+  run.spawnT-=run.speed;
+  if(run.spawnT<=0){
+    run.obstacles.push({x:RW+20,w:14+Math.random()*10,h:20+Math.random()*22});
+    run.spawnT=140+Math.random()*90;
+  }
+  run.obstacles.forEach(o=>o.x-=run.speed);
+  run.obstacles=run.obstacles.filter(o=>o.x>-40);
+  // collision
+  const cw=34,ch=40, cx=run.x, cy=run.y-ch;
+  run.obstacles.forEach(o=>{
+    const ox=o.x, oy=run.groundY-o.h;
+    if(cx+cw-6>ox && cx+6<ox+o.w && cy+ch>oy){ endRun(); }
+  });
+  drawRun();
+  document.getElementById("dist").textContent=Math.floor(run.dist);
+  if(run.alive)requestAnimationFrame(runLoop);
+}
+
+function drawRun(){
+  // sky
+  const g=rctx.createLinearGradient(0,0,0,RH);
+  g.addColorStop(0,"#b8e0f0");g.addColorStop(1,"#e8f4ec");
+  rctx.fillStyle=g;rctx.fillRect(0,0,RW,RH);
+  // parallax hills (2 layers)
+  run.bg1=(run.bg1-run.speed*0.3)%RW; run.bg2=(run.bg2-run.speed*0.6)%RW;
+  rctx.fillStyle="#a8d8a0";
+  for(let i=-1;i<3;i++){const bx=run.bg1+i*RW;
+    for(let x=0;x<RW;x+=6)rctx.fillRect(bx+x,RH*0.55+Math.sin((bx+x)*0.01)*18,6,RH);}
+  rctx.fillStyle="#7ac06a";
+  for(let i=-1;i<3;i++){const bx=run.bg2+i*RW;
+    for(let x=0;x<RW;x+=6)rctx.fillRect(bx+x,RH*0.64+Math.sin((bx+x)*0.02+2)*12,6,RH);}
+  // ground
+  rctx.fillStyle="#5aa84a";rctx.fillRect(0,run.groundY+38,RW,RH);
+  rctx.fillStyle="#4a983f";rctx.fillRect(0,run.groundY+38,RW,5);
+
+  // obstacles (rock/bush)
+  run.obstacles.forEach(o=>{
+    const oy=run.groundY+38-o.h;
+    rctx.fillStyle="#6a5a4a";rctx.fillRect(o.x,oy,o.w,o.h);
+    rctx.fillStyle="#8a7a6a";rctx.fillRect(o.x,oy,o.w,4);
+  });
+
+  // the runner — feet planted on the grass line.
+  // sprite is 16 rows * 3px = 48 tall; feet sit ~2 rows up from
+  // the grid bottom, so anchor so those feet meet groundLine.
+  const cd=CRITTERS[run.key];
+  const grid=cd.stages[run.stage];
+  const groundLine=run.groundY+38;          // actual grass surface
+  const spriteH=16*3;                        // 48
+  const footInset=2*3;                       // ~6px of empty rows under feet
+  const drawY=run.y-(groundLine-run.groundY) // convert y back to surface
+              ; // run.y already tracks the surface; simplify below
+  // run.y is the creature's ground reference (== groundY on ground).
+  // Place sprite bottom (minus foot inset) on the grass line, and let
+  // jump lift it via (run.y - run.groundY) offset.
+  const lift=run.groundY-run.y;              // >0 while airborne
+  const topY=groundLine-spriteH+footInset-lift;
+  drawPix(rctx,grid,PALS[cd.type], run.x-24, topY, 3);
+  // shadow shrinks as it jumps
+  const shScale=Math.max(.4,1-lift/120);
+  rctx.fillStyle=`rgba(0,0,0,${.18*shScale})`;
+  rctx.beginPath();rctx.ellipse(run.x,groundLine,18*shScale,5*shScale,0,0,6.28);rctx.fill();
+}
+
+function endRun(){
+  if(!run.alive)return;
+  run.alive=false;
+  const gainedXP=Math.floor(run.dist*0.6);
+  const gainedCoins=Math.floor(run.dist*0.35);
+  coins+=gainedCoins; syncCoins();
+  const r=roster[run.idx];
+  const before=r.stage;
+  r.xp+=gainedXP;
+  const after=stageFor(r.xp);
+  const evolved = after>before;
+  if(evolved)r.stage=after;
+  // sync wanderer stage
+  const w=wanderers.find(w=>w.key===r.key); if(w)w.stage=r.stage;
+
+  // results screen
+  const cd=CRITTERS[r.key];
+  document.getElementById("resTitle").textContent = evolved? "EVOLUTION!" : "RUN COMPLETE";
+  document.getElementById("resName").textContent=cd.name+" · "+cd.stageNames[r.stage];
+  document.getElementById("resDist").textContent=Math.floor(run.dist);
+  document.getElementById("resXP").textContent="+"+gainedXP+" XP";
+  document.getElementById("resCoins").textContent="+"+gainedCoins+" 🪙";
+  const evoTag=document.getElementById("resEvolve");
+  evoTag.innerHTML = evolved ? `<div class="evolve-tag">${cd.stageNames[before]} → ${cd.stageNames[r.stage]}</div>` : "";
+  const rc=document.getElementById("resCanvas").getContext("2d");
+  rc.clearRect(0,0,96,96);
+  drawPix(rc,cd.stages[r.stage],PALS[cd.type],0,0,6);
+  setTimeout(()=>document.getElementById("results").classList.add("show"),300);
+}
+
+document.getElementById("resContinue").addEventListener("click",()=>{
+  document.getElementById("results").classList.remove("show");
+  runC.style.display="none";
+  document.getElementById("runhud").classList.remove("show");
+  document.getElementById("playbtn").style.display="block";
+  run=null;
+});
+
+/* ---------- INIT ---------- */
+farmResize(); initWanderers(); syncCoins(); drawFarm();
+</script>
+</body>
+</html>

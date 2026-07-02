@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>COBBIES</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="app">
+  <!-- FARM -->
+  <canvas id="farm"></canvas>
+
+  <div class="topbar">
+    <span class="title">COBBIES</span>
+    <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
+  </div>
+
+  <!-- Home dialogue bubble (Phase 2 seed) -->
+  <div id="dialogue" class="dialogue">
+    <canvas id="dlgCanvas" width="48" height="48"></canvas>
+    <div class="dlg-bubble"><span id="dlgText">…</span></div>
+  </div>
+
+  <div id="farmbtns">
+    <button class="btn ghost" id="dexbtn">📖 DEX</button>
+    <button class="btn sec" id="hatchbtn">🥚 HATCH</button>
+    <button class="btn" id="playbtn">▶ PLAY</button>
+  </div>
+
+  <!-- NAME ENTRY (first launch) -->
+  <div class="screen center" id="nameScreen">
+    <canvas id="noraIntro" width="96" height="96"></canvas>
+    <h2>HI, I'M NORA!</h2>
+    <p class="intro">Welcome to the ranch. What should I call you?</p>
+    <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
+    <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- ROSTER SELECT -->
+  <div class="screen" id="rosterScreen">
+    <button class="backbtn" id="rosterBack">‹</button>
+    <h2>CHOOSE YOUR RUNNER</h2>
+    <div class="sub">FARTHER = MORE XP · ONE HIT ENDS THE RUN</div>
+    <div id="roster"></div>
+  </div>
+
+  <!-- COLLECTION / DEX -->
+  <div class="screen" id="dexScreen">
+    <button class="backbtn" id="dexBack">‹</button>
+    <h2>COLLECTION</h2>
+    <div class="sub" id="dexCount">—</div>
+    <div id="dexGrid"></div>
+  </div>
+
+  <!-- RUN -->
+  <canvas id="run" style="display:none"></canvas>
+  <div id="runhud">
+    <div class="hud-dist"><span class="hud-lbl">DISTANCE</span><span id="dist">0</span></div>
+    <div class="hud-dist"><span class="hud-lbl">RUNNER</span><span id="runnerName">—</span></div>
+  </div>
+
+  <!-- HATCH MENU (choose random egg vs direct buy) -->
+  <div class="screen center" id="hatchMenu">
+    <button class="backbtn" id="hatchMenuBack">‹</button>
+    <h2>THE HATCHERY</h2>
+    <p class="intro" id="pityHint">A random egg could be anyone…</p>
+    <button class="btn sec" id="eggRandom">🥚 RANDOM EGG · 50</button>
+    <button class="btn ghost" id="eggDirect">🎯 PICK A CRITTER · 150</button>
+    <div id="directList" class="direct-list"></div>
+  </div>
+
+  <!-- HATCH REVEAL -->
+  <div id="hatch">
+    <div class="htitle" id="hatchTitle">HATCHING...</div>
+    <div id="eggwrap"><canvas id="eggCanvas" width="60" height="70"></canvas></div>
+    <div id="hatchReveal">
+      <canvas id="hatchCanvas" width="96" height="96"></canvas>
+      <div class="hname" id="hatchName">—</div>
+      <div class="hnew" id="hatchTag"></div>
+    </div>
+    <button class="btn" id="hatchDone" style="display:none">ADD TO RANCH</button>
+  </div>
+
+  <!-- EVOLUTION (dedicated reveal moment) -->
+  <div id="evolve">
+    <div class="htitle">EVOLUTION!</div>
+    <canvas id="evoCanvas" width="120" height="120"></canvas>
+    <div class="hname" id="evoName">—</div>
+    <div class="evo-transition" id="evoTransition">—</div>
+    <button class="btn" id="evoDone">WONDERFUL!</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="big" id="resTitle">RUN COMPLETE</div>
+    <div class="rc">
+      <canvas id="resCanvas" width="96" height="96"></canvas>
+      <div class="line" id="resName">—</div>
+      <div class="line">Distance <b id="resDist">0</b>m</div>
+      <div class="line gain" id="resXP">+0 XP</div>
+      <div class="line" style="color:#c8a030;font-weight:700" id="resCoins">+0 🪙</div>
+    </div>
+    <button class="btn sec" id="resContinue">BACK TO RANCH</button>
+  </div>
+
+  <!-- CHARACTER CARD -->
+  <div id="card" class="overlay-card">
+    <div class="card-inner">
+      <canvas class="card-canvas" width="120" height="120"></canvas>
+      <div class="card-name">—</div>
+      <div class="card-stage">—</div>
+      <div class="card-rarity">—</div>
+      <div class="card-xpbar"><div class="card-xpfill"></div></div>
+      <div class="card-xp">0 XP</div>
+      <div class="card-flavor">—</div>
+      <div class="card-actions">
+        <button class="btn ghost" id="cardRename">✏ RENAME</button>
+        <button class="btn" id="cardClose">CLOSE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
