@@ -56,7 +56,7 @@ export function createRunner(canvas, onDistance, onEnd) {
     // dust kicked up on each footfall while grounded
     if (run.onGround) {
       run.strideT += run.speed;
-      if (run.strideT > 22) {
+      if (run.strideT > (run.key === 'nora' ? 15 : 22)) {
         run.strideT = 0;
         run.dust.push({ x: run.x - 16, y: run.groundY + 38, life: 1 });
       }
@@ -120,14 +120,29 @@ export function createRunner(canvas, onDistance, onEnd) {
     const footFromTop = spriteH - footInset;    // where the feet meet the ground
     const lift = run.groundY - run.y;           // >0 while airborne
     const grounded = lift < 1;
+    const isNora = run.key === 'nora';
 
     // Run cycle: phase advances with distance, so leg speed tracks run speed.
-    // While grounded the body bobs and squash/stretches on each footfall and
-    // leans into the stride; airborne it holds a forward leap pose.
-    const phase = run.dist * 0.5;
-    const bob = grounded ? Math.abs(Math.sin(phase)) * 4 : 0;
-    const squash = grounded ? Math.sin(phase * 2) * 0.07 : 0;
-    const lean = grounded ? Math.sin(phase) * 0.05 : 0.14;
+    // Nora has a bespoke gallop (rolling two-beat bound, forward reach + a
+    // bigger leap); every other creature uses the generic footfall trot.
+    const phase = run.dist * (isNora ? 0.62 : 0.5);
+    let bob = 0, lean = 0, sx = 1, sy = 1;
+    if (!grounded) {
+      lean = isNora ? 0.22 : 0.14;                 // leap / bound pose
+    } else if (isNora) {
+      const b = Math.abs(Math.sin(phase)) * 0.7 + Math.abs(Math.sin(phase + 1)) * 0.3;
+      const reach = Math.cos(phase);
+      bob = b * 8;
+      lean = 0.1 + Math.sin(phase) * 0.06;
+      sx = 1 + reach * 0.1;                         // stretch forward mid-bound
+      sy = 1 - reach * 0.08;
+    } else {
+      const squash = Math.sin(phase * 2) * 0.07;
+      bob = Math.abs(Math.sin(phase)) * 4;
+      lean = Math.sin(phase) * 0.05;
+      sx = 1 + squash * 0.4;
+      sy = 1 - squash;
+    }
 
     // dust puffs behind the feet
     for (const p of run.dust) {
@@ -146,7 +161,7 @@ export function createRunner(canvas, onDistance, onEnd) {
     ctx.save();
     ctx.translate(run.x, groundLine - lift - bob);
     ctx.rotate(lean);
-    ctx.scale(1 + squash * 0.4, 1 - squash);
+    ctx.scale(sx, sy);
     drawPix(ctx, grid, PALS[cd.type], -24, -footFromTop, cell);
     ctx.restore();
   }

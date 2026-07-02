@@ -36,6 +36,10 @@ export const DIALOGUE = {
     "Boing! Hi {name}! Boing boing!",
     "I glow a little brighter when you visit. Fun fact!",
   ],
+  tiger: [
+    "Rrrr— oh, hi {name}. Didn't mean to startle you.",
+    "Big stripes, bigger heart. That's the RAJAH way, {name}.",
+  ],
 };
 
 /** Pick a line for a species, with the player's name spliced in. */
