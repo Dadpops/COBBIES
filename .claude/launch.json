@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "cobbies",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "-l", "8000", "."],
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8000"],
       "port": 8000
     }
   ]
