@@ -14,15 +14,19 @@ import * as Save from './systems/save.js';
 import { createFarm, AVATAR_KEY } from './systems/farm.js';
 import { createRunner } from './systems/run.js';
 import { createWhack } from './systems/whack.js';
-import { createMusic } from './audio/music.js';
+import { createMusic, TRACKS } from './audio/music.js';
 import { createSfx } from './audio/sfx.js';
 import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
 } from './systems/hatch.js';
 import {
+  STATIONS, totalAccrued, collectAll, collectOne, assign as assignStation,
+  unassign as unassignStation, stationOf, expand as expandRanch, isFull,
+} from './systems/idle.js';
+import {
   renderRoster, renderDex, renderCard, renderScenes, displayName,
-  renderAvatarEditor, drawAvatarPreview,
+  renderAvatarEditor, drawAvatarPreview, renderStations, renderPicker,
 } from './ui/screens.js';
 
 const $ = (id) => document.getElementById(id);
@@ -73,7 +77,8 @@ function enterMinigame() {
   runActive = true;
   startBuddy();
   sfx.resume();
-  if (state.settings.musicOn) { music.start(); music.setIntensity(0); }
+  startMusicOnce();
+  music.setIntensity(0);           // ramps up as the match goes on
 }
 function exitMinigame() {
   $('farmbtns').style.display = 'flex';
@@ -81,9 +86,25 @@ function exitMinigame() {
   $('dailyBanner').style.display = '';
   runActive = false;
   stopBuddy();
-  music.stop();
+  music.setIntensity(0);           // calm again on the farm — music keeps playing
   renderDailyBanner();
 }
+
+/* ---------- music: plays across the whole game once started ---------- */
+let musicStarted = false;
+function applyMusicSettings() {
+  music.setTrack(state.settings.track);
+  music.setVolume(state.settings.volume);
+  music.setDynamic(state.settings.musicDynamic);
+}
+function startMusicOnce() {
+  if (musicStarted || !state.settings.musicOn) return;
+  applyMusicSettings();
+  music.start();
+  musicStarted = true;
+}
+// Browsers require a gesture before audio — start on the very first tap.
+window.addEventListener('pointerdown', startMusicOnce, { once: false });
 
 /* ---------- coin display ---------- */
 function syncCoins() {
@@ -97,6 +118,9 @@ function syncCoins() {
 function boot() {
   farm.start();
   ensureDaily(state);
+  // idle earnings collected while away
+  const away = totalAccrued(state, Date.now());
+  if (away > 0) { collectAll(state, Date.now()); toast(`🧺 Your ranch earned ${away} 🪙 while you were away!`); }
   persist();
   renderDailyBanner();
   syncCoins();
@@ -189,16 +213,107 @@ function openBuddySelect() {
   $('buddyScreen').classList.add('show');
 }
 
-/* ---------- music toggle ---------- */
-$('musicToggle').addEventListener('click', () => {
-  state.settings.musicOn = !state.settings.musicOn;
-  persist();
-  updateMusicToggle();
-  if (!state.settings.musicOn) music.stop();
-  else if (runActive) music.start();
-});
-function updateMusicToggle() {
-  $('musicToggle').textContent = state.settings.musicOn ? '🔊 MUSIC: ON' : '🔇 MUSIC: OFF';
+/* ---------- sound options (opens Settings) ---------- */
+$('musicToggle').addEventListener('click', openSettings);
+function updateMusicToggle() { $('musicToggle').textContent = '🎵 SOUND OPTIONS'; }
+
+/* ============================================================
+   SETTINGS — music track / volume / dynamic-tempo / on-off.
+   ============================================================ */
+$('settingsbtn').addEventListener('click', openSettings);
+$('settingsBack').addEventListener('click', () => $('settingsScreen').classList.remove('show'));
+function openSettings() { renderSettings(); $('settingsScreen').classList.add('show'); }
+function renderSettings() {
+  const b = $('settingsBody');
+  b.innerHTML = '';
+  b.appendChild(toggleRow('MUSIC', state.settings.musicOn, () => {
+    state.settings.musicOn = !state.settings.musicOn; persist();
+    if (state.settings.musicOn) { musicStarted = false; startMusicOnce(); }
+    else { music.stop(); musicStarted = false; }
+    renderSettings();
+  }));
+  b.appendChild(chipRow('TRACK', TRACKS.map((t) => t.name), state.settings.track, (i) => {
+    state.settings.track = i; persist(); music.setTrack(i);
+    if (state.settings.musicOn) startMusicOnce();
+    renderSettings();
+  }));
+  const vr = document.createElement('div'); vr.className = 'set-row';
+  vr.innerHTML = '<span class="set-label">VOLUME</span>';
+  const slider = document.createElement('input');
+  slider.type = 'range'; slider.min = '0'; slider.max = '100'; slider.className = 'set-vol';
+  slider.value = Math.round(state.settings.volume * 100);
+  slider.addEventListener('input', () => { state.settings.volume = slider.value / 100; music.setVolume(state.settings.volume); });
+  slider.addEventListener('change', persist);
+  vr.appendChild(slider); b.appendChild(vr);
+  b.appendChild(toggleRow('SPEED-UP IN GAMES', state.settings.musicDynamic, () => {
+    state.settings.musicDynamic = !state.settings.musicDynamic; persist();
+    music.setDynamic(state.settings.musicDynamic); renderSettings();
+  }));
+}
+function toggleRow(label, on, onClick) {
+  const row = document.createElement('div'); row.className = 'set-row';
+  row.innerHTML = `<span class="set-label">${label}</span>`;
+  const opts = document.createElement('div'); opts.className = 'set-opts';
+  ['ON', 'OFF'].forEach((t, i) => {
+    const active = (i === 0) === on;
+    const btn = document.createElement('button');
+    btn.className = 'av-chip' + (active ? ' on' : '');
+    btn.textContent = t;
+    btn.addEventListener('click', () => { if (!active) onClick(); });
+    opts.appendChild(btn);
+  });
+  row.appendChild(opts); return row;
+}
+function chipRow(label, names, sel, onPick) {
+  const row = document.createElement('div'); row.className = 'set-row';
+  row.innerHTML = `<span class="set-label">${label}</span>`;
+  const opts = document.createElement('div'); opts.className = 'set-opts';
+  names.forEach((n, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'av-chip' + (sel === i ? ' on' : '');
+    btn.textContent = n;
+    btn.addEventListener('click', () => onPick(i));
+    opts.appendChild(btn);
+  });
+  row.appendChild(opts); return row;
+}
+
+/* ============================================================
+   RANCH JOBS (idle) — station critters to earn coins over time,
+   expand the ranch to hold more critters.
+   ============================================================ */
+$('jobsbtn').addEventListener('click', openJobs);
+$('jobsBack').addEventListener('click', () => $('jobsScreen').classList.remove('show'));
+function jobsHandlers() {
+  return {
+    onAssign: (id) => {
+      const st = STATIONS.find((s) => s.id === id);
+      openPicker('STATION AT ' + st.name.toUpperCase(),
+        (key) => stationOf(state, key) === id,
+        (key) => { assignStation(state, id, key, Date.now()); persist(); $('pickerScreen').classList.remove('show'); refreshJobs(); });
+    },
+    onUnassign: (id) => { unassignStation(state, id, Date.now()); persist(); syncCoins(); refreshJobs(); },
+    onCollect: (id) => { if (collectOne(state, id, Date.now())) { persist(); syncCoins(); beep(() => sfx.coin()); } refreshJobs(); },
+    onExpand: () => { if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); refreshJobs(); } },
+  };
+}
+function refreshJobs() { renderStations($('jobsList'), state, Date.now(), jobsHandlers()); }
+function openJobs() { refreshJobs(); $('jobsScreen').classList.add('show'); }
+
+/* ---------- generic creature picker ---------- */
+$('pickerBack').addEventListener('click', () => $('pickerScreen').classList.remove('show'));
+function openPicker(title, disabledFn, onPick) {
+  $('pickerTitle').textContent = title;
+  renderPicker($('pickerGrid'), state, disabledFn, onPick);
+  $('pickerScreen').classList.add('show');
+}
+
+/* ---------- welcome-back toast ---------- */
+function toast(text, ms = 3400) {
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = text;
+  $('app').appendChild(el);
+  setTimeout(() => el.remove(), ms);
 }
 
 /* ============================================================
@@ -379,7 +494,7 @@ function remainingToFind() {
 }
 function openHatchMenu() {
   updatePityHint();
-  $('eggRandom').disabled = state.coins < EGG_COST || remainingToFind() === 0;
+  $('eggRandom').disabled = state.coins < EGG_COST || remainingToFind() === 0 || isFull(state);
   $('eggDirect').disabled = state.coins < DIRECT_COST;
   $('eggRandom').textContent = `🥚 RANDOM EGG · ${EGG_COST}`;
   $('eggDirect').textContent = `🎯 PICK A CRITTER · ${DIRECT_COST}`;
@@ -389,6 +504,10 @@ function openHatchMenu() {
 }
 function updatePityHint() {
   const remaining = remainingToFind();
+  if (isFull(state) && remaining > 0) {
+    $('pityHint').textContent = 'Ranch is full — expand it in Jobs to make room!';
+    return;
+  }
   if (remaining === 0) {
     $('pityHint').textContent = "You've collected every cobbie! 🎉";
     return;
@@ -425,6 +544,7 @@ $('eggDirect').addEventListener('click', () => {
     list.appendChild(row);
     drawPix(row.querySelector('canvas').getContext('2d'), cd.stages[0], PALS[cd.type], -4, -4, 3);
     row.addEventListener('click', () => {
+      if (!owned && isFull(state)) { toast('Ranch is full — expand it in Jobs!'); return; }
       const result = directBuy(state, key);
       if (!result) return;
       persist(); syncCoins();

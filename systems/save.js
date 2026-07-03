@@ -44,10 +44,12 @@ export function defaultState() {
     coins: 40,
     roster,
     pity: 0,
+    capacity: 8,   // ranch starts small; expand it with idle coins
     avatar: defaultAvatar(),
     buddy: 'nora',
-    daily: null, // filled in by ensureDaily() on boot
-    settings: { musicOn: true, biome: 'meadow' },
+    daily: null,   // filled in by ensureDaily() on boot
+    stations: { berry: { key: null, since: 0 }, pond: { key: null, since: 0 }, lookout: { key: null, since: 0 } },
+    settings: { musicOn: true, musicDynamic: true, volume: 0.7, track: 0, biome: 'meadow' },
   };
 }
 
@@ -95,11 +97,14 @@ function migrate(s) {
     ...base,
     ...s,
     avatar: { ...base.avatar, ...(s.avatar || {}) },
+    stations: { ...base.stations, ...(s.stations || {}) },
     settings: { ...base.settings, ...(s.settings || {}) },
   };
   if (!Array.isArray(state.roster) || state.roster.length === 0) {
     state.roster = base.roster;
   }
+  // never strand an existing collection: capacity is at least what they hold
+  state.capacity = Math.max(s.capacity ?? 8, state.roster.length);
   state.roster = state.roster.map((r) => ({
     key: r.key,
     xp: r.xp | 0,

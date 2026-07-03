@@ -7,6 +7,7 @@
 import { CRITTERS, PALS, EVO_XP, RARITY, HATCH_POOL } from '../data/creatures.js';
 import { BIOMES } from '../data/biomes.js';
 import { AVATAR_OPTIONS, drawAvatar } from '../data/avatar.js';
+import { STATIONS, rateFor, accruedFor, expandCost } from '../systems/idle.js';
 import { drawPix, drawCentered } from '../render/pixel.js';
 
 /** Display name for an owned creature (nickname overrides the default). */
@@ -62,16 +63,16 @@ export function renderDex(container, state, onPick) {
   for (const key of all) {
     const cd = CRITTERS[key];
     const owned = ownedKeys.has(key);
+    const r = owned ? state.roster.find((x) => x.key === key) : null;
     const cell = document.createElement('div');
     cell.className = 'dcell' + (owned ? '' : ' locked');
     const rarity = RARITY[cd.rarity];
     cell.innerHTML = `<canvas width="48" height="48"></canvas>
-      <div class="dname">${owned ? cd.name : '???'}</div>
+      <div class="dname">${owned ? displayName(r) : '???'}</div>
       <div class="drar" style="color:${rarity.color}">${rarity.label}</div>`;
     container.appendChild(cell);
     const cx = cell.querySelector('canvas').getContext('2d');
     if (owned) {
-      const r = state.roster.find((x) => x.key === key);
       drawPix(cx, cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
       cell.addEventListener('click', () => onPick(key));
     } else {
@@ -91,6 +92,77 @@ function drawSilhouette(ctx, grid, ox, oy, cell) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('?', ox + 24, oy + 24);
+}
+
+/**
+ * Ranch Jobs screen: one card per station (worker, rate, collectable coins)
+ * plus the capacity/expand panel.
+ * @param {HTMLElement} container
+ * @param {object} state
+ * @param {number} now  Date.now()
+ * @param {{onAssign,onUnassign,onCollect,onExpand:Function}} h
+ */
+export function renderStations(container, state, now, h) {
+  container.innerHTML = '';
+  for (const st of STATIONS) {
+    const s = state.stations[st.id] || { key: null };
+    const cr = s.key ? state.roster.find((r) => r.key === s.key) : null;
+    const acc = accruedFor(state, st.id, now);
+    const row = document.createElement('div');
+    row.className = 'job-row';
+    row.innerHTML = `
+      <div class="job-head"><span class="job-emoji">${st.emoji}</span><span class="job-name">${st.name}</span></div>
+      <div class="job-body">
+        <canvas class="job-critter" width="48" height="48"></canvas>
+        <div class="job-info">
+          <div class="job-worker">${cr ? displayName(cr) : 'No worker'}</div>
+          <div class="job-rate">${cr ? rateFor(st, cr) + ' 🪙/hr' : 'Station a critter here'}</div>
+        </div>
+        <div class="job-actions">
+          ${cr ? `<button class="job-btn collect" data-a="collect" ${acc ? '' : 'disabled'}>+${acc} 🪙</button>` : ''}
+          <button class="job-btn" data-a="assign">${cr ? 'CHANGE' : 'ASSIGN'}</button>
+          ${cr ? `<button class="job-btn ghost" data-a="remove">✕</button>` : ''}
+        </div>
+      </div>`;
+    container.appendChild(row);
+    if (cr) drawPix(row.querySelector('.job-critter').getContext('2d'),
+      CRITTERS[cr.key].stages[cr.stage], PALS[CRITTERS[cr.key].type], 0, 0, 3);
+    row.querySelectorAll('[data-a]').forEach((btn) => btn.addEventListener('click', () => {
+      const a = btn.dataset.a;
+      if (a === 'collect') h.onCollect(st.id);
+      else if (a === 'remove') h.onUnassign(st.id);
+      else h.onAssign(st.id);
+    }));
+  }
+  const cost = expandCost(state.capacity);
+  const cap = document.createElement('div');
+  cap.className = 'cap-panel';
+  cap.innerHTML = `
+    <div class="cap-info">Ranch space <b>${state.roster.length} / ${state.capacity}</b></div>
+    <button class="job-btn accent" id="expandBtn" ${state.coins < cost ? 'disabled' : ''}>EXPAND +2 · ${cost} 🪙</button>`;
+  container.appendChild(cap);
+  cap.querySelector('#expandBtn').addEventListener('click', h.onExpand);
+}
+
+/**
+ * Generic owned-creature picker grid (used for station assignment).
+ * @param {HTMLElement} container
+ * @param {object} state
+ * @param {(key:string)=>boolean} disabledFn  return true to grey out a creature
+ * @param {(key:string)=>void} onPick
+ */
+export function renderPicker(container, state, disabledFn, onPick) {
+  container.innerHTML = '';
+  for (const r of state.roster) {
+    const cd = CRITTERS[r.key];
+    const off = disabledFn(r.key);
+    const cell = document.createElement('div');
+    cell.className = 'dcell' + (off ? ' busy' : '');
+    cell.innerHTML = `<canvas width="48" height="48"></canvas><div class="dname">${displayName(r)}</div>`;
+    container.appendChild(cell);
+    drawPix(cell.querySelector('canvas').getContext('2d'), cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
+    if (!off) cell.addEventListener('click', () => onPick(r.key));
+  }
 }
 
 /** Redraw the avatar preview canvas from a selection. */

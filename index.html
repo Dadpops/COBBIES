@@ -16,6 +16,7 @@
     <div class="top-right">
       <button class="iconbtn" id="avatarbtn" title="Your avatar">🧑</button>
       <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
+      <button class="iconbtn" id="settingsbtn" title="Settings">⚙️</button>
       <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
     </div>
   </div>
@@ -41,6 +42,7 @@
 
   <div id="farmbtns">
     <button class="btn ghost" id="dexbtn">📖 DEX</button>
+    <button class="btn ghost" id="jobsbtn">🧰 JOBS</button>
     <button class="btn sec" id="hatchbtn">🥚 HATCH</button>
     <button class="btn" id="playbtn">▶ PLAY</button>
   </div>
@@ -52,6 +54,29 @@
     <p class="intro">Welcome to the ranch. What should I call you?</p>
     <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
     <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- JOBS / IDLE STATIONS -->
+  <div class="screen" id="jobsScreen">
+    <button class="backbtn" id="jobsBack">‹</button>
+    <h2>RANCH JOBS</h2>
+    <div class="sub">STATION CRITTERS TO EARN COINS OVER TIME</div>
+    <div id="jobsList"></div>
+  </div>
+
+  <!-- SETTINGS (music options) -->
+  <div class="screen center" id="settingsScreen">
+    <button class="backbtn" id="settingsBack">‹</button>
+    <h2>SETTINGS</h2>
+    <div id="settingsBody"></div>
+  </div>
+
+  <!-- GENERIC CREATURE PICKER (station assignment) -->
+  <div class="screen" id="pickerScreen">
+    <button class="backbtn" id="pickerBack">‹</button>
+    <h2 id="pickerTitle">CHOOSE A CRITTER</h2>
+    <div class="sub" id="pickerSub">&nbsp;</div>
+    <div id="pickerGrid"></div>
   </div>
 
   <!-- MINIGAME HUB -->
@@ -177,7 +202,7 @@
       <div class="card-xp">0 XP</div>
       <div class="card-flavor">—</div>
       <div class="card-actions">
-        <button class="btn ghost" id="cardRename">✏ RENAME</button>
+        <button class="btn ghost" id="cardRename">✏ NICKNAME</button>
         <button class="btn" id="cardClose">CLOSE</button>
       </div>
     </div>
@@ -186,8 +211,8 @@
   <!-- RENAME MODAL (in-app; prompt() is blocked in embedded contexts) -->
   <div id="renameModal" class="overlay-card">
     <div class="card-inner">
-      <div class="card-name">RENAME</div>
-      <input id="renameInput" maxlength="14" placeholder="NEW NAME" autocomplete="off" />
+      <div class="card-name">NICKNAME</div>
+      <input id="renameInput" maxlength="14" placeholder="NICKNAME" autocomplete="off" />
       <div class="card-actions">
         <button class="btn ghost" id="renameCancel">CANCEL</button>
         <button class="btn" id="renameSave">SAVE</button>

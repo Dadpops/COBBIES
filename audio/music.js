@@ -1,32 +1,33 @@
 /**
- * MUSIC — a relaxing, generative synth loop built on the Web Audio API.
+ * MUSIC — relaxing generative synth on the Web Audio API, now with:
+ *   - 4 selectable TRACKS (different scale / pattern / timbre / mood)
+ *   - VOLUME control (0..1)
+ *   - a DYNAMIC toggle: when off, tempo stays constant (no speed-up)
  *
- * A soft triangle-wave arpeggio over a minor-pentatonic scale, run through a
- * gentle low-pass filter and a little feedback delay for space, plus a warm
- * sustained pad underneath. It's calm by design; the only thing that changes
- * with intensity is TEMPO — notes start slow and speed up as a match heats
- * up, but the pace is clamped so it never turns frantic or harsh.
- *
- *   const music = createMusic();
- *   music.start();                 // resumes the audio context (needs a gesture)
- *   music.setIntensity(0..1);      // 0 = slowest, 1 = fastest (capped)
- *   music.stop();
+ * It's meant to play continuously across the whole game; only the *tempo*
+ * responds to intensity during minigames, and only while dynamic is on.
+ * Call start() from a user gesture (browser autoplay policy).
  */
 
+export const TRACKS = [
+  { name: 'MEADOW', root: 220, scale: [0, 2, 4, 7, 9],  pattern: [0, 2, 4, 2, 3, 4, 2, 1], wave: 'triangle', padWave: 'sine',     cutoff: 1500, slow: 0.50, fast: 0.30 },
+  { name: 'DUSK',   root: 174, scale: [0, 3, 5, 7, 10], pattern: [0, 2, 4, 3, 2, 1, 3, 2], wave: 'sine',     padWave: 'sine',     cutoff: 1100, slow: 0.56, fast: 0.34 },
+  { name: 'ARCADE', root: 262, scale: [0, 2, 4, 5, 7],  pattern: [0, 1, 2, 3, 4, 3, 2, 1], wave: 'square',   padWave: 'triangle', cutoff: 2200, slow: 0.42, fast: 0.24 },
+  { name: 'LO-FI',  root: 196, scale: [0, 3, 5, 7, 10], pattern: [0, 4, 2, 5, 3, 2, 4, 1], wave: 'triangle', padWave: 'sine',     cutoff: 900,  slow: 0.62, fast: 0.42 },
+];
+
 export function createMusic() {
-  let ctx = null, master = null, filter = null, delay = null, pad = null;
-  let running = false, intensity = 0, step = 0, nextTime = 0, timer = 0;
+  let ctx = null, master = null, filter = null, delay = null, padGain = null, padOscs = [];
+  let running = false, dynamic = true, intensity = 0, volume = 0.7;
+  let step = 0, nextTime = 0, timer = 0, trackIdx = 0;
 
-  const SCALE = [0, 3, 5, 7, 10];        // minor pentatonic (semitones)
-  const ROOT = 220;                       // A3
-  const PATTERN = [0, 2, 4, 2, 1, 3, 5, 3]; // gentle rolling arpeggio (scale steps)
-
-  const SLOW = 0.46, FAST = 0.26;         // seconds/note — gentle clamped range
+  const T = () => TRACKS[trackIdx];
 
   function hz(scaleStep) {
-    const oct = Math.floor(scaleStep / SCALE.length);
-    const deg = SCALE[((scaleStep % SCALE.length) + SCALE.length) % SCALE.length];
-    return ROOT * Math.pow(2, (deg + 12 * oct) / 12);
+    const sc = T().scale;
+    const oct = Math.floor(scaleStep / sc.length);
+    const deg = sc[((scaleStep % sc.length) + sc.length) % sc.length];
+    return T().root * Math.pow(2, (deg + 12 * oct) / 12);
   }
 
   function ensure() {
@@ -35,78 +36,84 @@ export function createMusic() {
     if (!AC) return false;
     ctx = new AC();
     master = ctx.createGain(); master.gain.value = 0;
-
     filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 1500; filter.Q.value = 0.5;
-
+    filter.type = 'lowpass'; filter.frequency.value = T().cutoff; filter.Q.value = 0.5;
     delay = ctx.createDelay(); delay.delayTime.value = 0.34;
-    const fb = ctx.createGain(); fb.gain.value = 0.26;
+    const fb = ctx.createGain(); fb.gain.value = 0.24;
     delay.connect(fb); fb.connect(delay);
-
-    filter.connect(master);
-    delay.connect(filter);
-    master.connect(ctx.destination);
-
-    // warm pad: two slightly detuned sines on root + fifth, very quiet
-    pad = ctx.createGain(); pad.gain.value = 0.05;
-    pad.connect(filter);
-    [ROOT / 2, ROOT * 0.75].forEach((f, i) => {
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.value = f; o.detune.value = i ? 4 : -4;
-      o.connect(pad); o.start();
-    });
+    filter.connect(master); delay.connect(filter); master.connect(ctx.destination);
+    padGain = ctx.createGain(); padGain.gain.value = 0.05; padGain.connect(filter);
+    buildPad();
     return true;
   }
 
+  function buildPad() {
+    padOscs.forEach((o) => { try { o.stop(); } catch { /* already stopped */ } });
+    padOscs = [];
+    const f = T().root;
+    [f / 2, f * 0.75].forEach((fr, i) => {
+      const o = ctx.createOscillator();
+      o.type = T().padWave; o.frequency.value = fr; o.detune.value = i ? 4 : -4;
+      o.connect(padGain); o.start(); padOscs.push(o);
+    });
+  }
+
   function playNote(time) {
-    const measurePos = step % PATTERN.length;
-    const base = PATTERN[measurePos];
-    // drift up an octave now and then for a twinkle
-    const oct = (step % 16 === 8) ? SCALE.length : 0;
+    const p = T().pattern;
+    const base = p[step % p.length];
+    const oct = (step % 16 === 8) ? T().scale.length : 0;
     const o = ctx.createOscillator();
-    o.type = 'triangle';
-    o.frequency.value = hz(base + oct);
+    o.type = T().wave; o.frequency.value = hz(base + oct);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, time);
-    g.gain.linearRampToValueAtTime(0.13, time + 0.03);
+    g.gain.linearRampToValueAtTime(0.12, time + 0.03);
     g.gain.exponentialRampToValueAtTime(0.0008, time + 0.5);
     o.connect(g); g.connect(filter); g.connect(delay);
     o.start(time); o.stop(time + 0.55);
     step++;
   }
 
-  function noteInterval() {
-    return SLOW - (SLOW - FAST) * Math.max(0, Math.min(1, intensity));
-  }
+  const eff = () => (dynamic ? Math.max(0, Math.min(1, intensity)) : 0.1);
+  const interval = () => { const t = T(); return t.slow - (t.slow - t.fast) * eff(); };
 
   function scheduler() {
     if (!running) return;
-    while (nextTime < ctx.currentTime + 0.25) {
-      playNote(nextTime);
-      nextTime += noteInterval();
-    }
+    while (nextTime < ctx.currentTime + 0.25) { playNote(nextTime); nextTime += interval(); }
+  }
+
+  function applyVolume() {
+    if (!master) return;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setTargetAtTime(0.5 * volume, ctx.currentTime, 0.2);
   }
 
   return {
     start() {
       if (!ensure()) return;
       if (ctx.state === 'suspended') ctx.resume();
+      if (running) { applyVolume(); return; }
       running = true; step = 0; nextTime = ctx.currentTime + 0.08;
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
-      master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 1.2); // fade in
-      clearInterval(timer);
-      timer = setInterval(scheduler, 60);
+      master.gain.setValueAtTime(0, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0.5 * volume, ctx.currentTime + 1.0);
+      clearInterval(timer); timer = setInterval(scheduler, 60);
     },
-    setIntensity(v) { intensity = v; },
     stop() {
-      running = false;
-      clearInterval(timer); timer = 0;
+      running = false; clearInterval(timer); timer = 0;
       if (ctx && master) {
         master.gain.cancelScheduledValues(ctx.currentTime);
         master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
-        master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6); // fade out
+        master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
       }
     },
+    setIntensity(v) { intensity = v; },
+    setDynamic(b) { dynamic = b; },
+    setVolume(v) { volume = Math.max(0, Math.min(1, v)); if (running) applyVolume(); },
+    setTrack(i) {
+      trackIdx = ((i % TRACKS.length) + TRACKS.length) % TRACKS.length;
+      if (ctx) { filter.frequency.setTargetAtTime(T().cutoff, ctx.currentTime, 0.2); buildPad(); }
+    },
+    trackIndex() { return trackIdx; },
+    isPlaying() { return running; },
   };
 }

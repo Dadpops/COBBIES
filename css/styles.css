@@ -270,3 +270,52 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
   0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
   18%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}
   100%{opacity:0;transform:translate(-50%,-170%) scale(1)}}
+
+/* ---- compact farm buttons (now 4) ---- */
+#farmbtns .btn{padding:13px 12px;font-size:11px;letter-spacing:.1em}
+
+/* ---- ranch jobs ---- */
+#jobsList{flex:1;overflow-y:auto;padding:0 16px 24px;display:flex;flex-direction:column;gap:12px}
+.job-row{background:var(--paper);border:3px solid var(--line);border-radius:14px;padding:10px 12px;
+  box-shadow:2px 2px 0 rgba(0,0,0,.2)}
+.job-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.job-emoji{font-size:16px}
+.job-name{font-size:11px;letter-spacing:.1em;font-weight:700}
+.job-body{display:flex;align-items:center;gap:10px}
+.job-critter{position:static;width:44px;height:44px;flex-shrink:0;
+  background:#eef4d8;border-radius:8px}
+.job-info{flex:1;min-width:0}
+.job-worker{font-size:11px;letter-spacing:.06em;font-weight:700}
+.job-rate{font-size:9px;color:#8a7a5a;letter-spacing:.04em;margin-top:2px}
+.job-actions{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.job-btn{font-family:inherit;font-size:9px;letter-spacing:.06em;font-weight:700;color:#fff;
+  background:#8a7a5a;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.job-btn.collect{background:#3a8f4a}
+.job-btn.collect:disabled{background:#b0b0a0;opacity:.7;cursor:default}
+.job-btn.accent{background:var(--accent)}
+.job-btn.accent:disabled{background:#b0b0b0;opacity:.7;cursor:default}
+.job-btn.ghost{background:#c05a4a;padding:7px 9px}
+.cap-panel{background:#26313d;border:2px solid #3a4a5a;border-radius:14px;padding:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+.cap-info{color:#cde;font-size:10px;letter-spacing:.06em}
+.cap-info b{color:#fff}
+
+/* ---- settings ---- */
+#settingsScreen{align-items:center;justify-content:flex-start;overflow-y:auto;padding:56px 16px 28px;gap:14px}
+#settingsBody{width:100%;max-width:320px;display:flex;flex-direction:column;gap:16px}
+.set-row{display:flex;flex-direction:column;gap:7px}
+.set-label{font-size:9px;letter-spacing:.16em;color:#9ab;font-weight:700}
+.set-opts{display:flex;flex-wrap:wrap;gap:7px}
+.set-vol{width:100%;accent-color:var(--accent)}
+
+/* ---- picker (station assign) ---- */
+#pickerGrid{flex:1;overflow-y:auto;padding:0 16px 24px;display:grid;
+  grid-template-columns:repeat(3,1fr);gap:12px;align-content:start}
+.dcell.busy{opacity:.4;cursor:default}
+
+/* ---- welcome-back toast ---- */
+.toast{position:absolute;top:96px;left:50%;transform:translateX(-50%);z-index:35;
+  background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px 18px;
+  font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.04em;text-align:center;
+  box-shadow:2px 2px 0 rgba(0,0,0,.2);animation:toastin .4s ease}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
