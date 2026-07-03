@@ -259,3 +259,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 #buddyGrid{flex:1;overflow-y:auto;padding:0 16px 24px;display:grid;
   grid-template-columns:repeat(3,1fr);gap:12px;align-content:start}
 .dcell.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,149,74,.4),2px 2px 0 rgba(0,0,0,.2)}
+
+/* ---- floating coin/X popups ---- */
+.float-pop{position:fixed;transform:translate(-50%,-50%);z-index:40;pointer-events:none;
+  font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700;letter-spacing:.04em;
+  animation:floatup .85s ease-out forwards}
+.float-pop.coin{color:#f4b333;text-shadow:1px 1px 0 rgba(80,50,0,.4)}
+.float-pop.x{color:#ff4a3a;font-size:20px;text-shadow:1px 1px 0 rgba(0,0,0,.3)}
+@keyframes floatup{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
+  18%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}
+  100%{opacity:0;transform:translate(-50%,-170%) scale(1)}}

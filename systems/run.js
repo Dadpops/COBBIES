@@ -13,7 +13,7 @@ import { drawPix } from '../render/pixel.js';
  * @param {(dist:number)=>void} onDistance   HUD tick
  * @param {(dist:number)=>void} onEnd         run finished at this distance
  */
-export function createRunner(canvas, onDistance, onEnd) {
+export function createRunner(canvas, onDistance, onEnd, onClear) {
   const ctx = canvas.getContext('2d');
   const JUMP_V = -9.8;   // a touch floatier than the prototype for easier timing
   const GRAV = 0.46;
@@ -45,7 +45,7 @@ export function createRunner(canvas, onDistance, onEnd) {
       key: creature.key, stage: creature.stage,
       x: RW * 0.35, y: groundY, vy: 0, groundY, onGround: true,
       dist: 0, speed: 2.3, obstacles: [], spawnT: 240, alive: true, t: 0,
-      bg1: 0, bg2: 0, strideT: 0, dust: [], coyote: 6, jumpBuffer: 0,
+      bg1: 0, bg2: 0, strideT: 0, dust: [], coyote: 6, jumpBuffer: 0, clears: 0,
     };
     if (!raf) loop();
   }
@@ -53,7 +53,7 @@ export function createRunner(canvas, onDistance, onEnd) {
   function loop() {
     if (!run) { raf = 0; return; }
     run.t += 0.016;
-    if (run.speed < 6.8) run.speed += 0.0016; // steadily speeds up, then caps
+    if (run.speed < 6.6) run.speed += 0.0010; // steadily speeds up, then caps
     run.dist += run.speed * 0.5;
 
     // coyote time: brief window to still jump just after leaving the ground
@@ -84,7 +84,20 @@ export function createRunner(canvas, onDistance, onEnd) {
       run.obstacles.push({ x: RW + 20, w: 14 + Math.random() * 10, h: 20 + Math.random() * 22 });
       run.spawnT = 140 + Math.random() * 90;
     }
-    for (const o of run.obstacles) o.x -= run.speed;
+    for (const o of run.obstacles) {
+      o.x -= run.speed;
+      // cleared: obstacle's right edge has passed the runner without a hit
+      if (!o.cleared && o.x + o.w < run.x - 4) {
+        o.cleared = true; run.clears++;
+        if (onClear) {
+          const rect = canvas.getBoundingClientRect();
+          onClear(
+            rect.left + run.x * (rect.width / RW),
+            rect.top + (run.groundY - 26) * (rect.height / RH)
+          );
+        }
+      }
+    }
     run.obstacles = run.obstacles.filter((o) => o.x > -40);
 
     const cw = 34, ch = 40, cx = run.x, cy = run.y - ch;
@@ -185,7 +198,7 @@ export function createRunner(canvas, onDistance, onEnd) {
     if (!run.alive) return;
     run.alive = false;
     const dist = Math.floor(run.dist);
-    onEnd(dist);
+    onEnd(dist, run.clears);
   }
 
   canvas.addEventListener('pointerdown', jump);

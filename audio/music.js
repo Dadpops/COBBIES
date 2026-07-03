@@ -21,7 +21,7 @@ export function createMusic() {
   const ROOT = 220;                       // A3
   const PATTERN = [0, 2, 4, 2, 1, 3, 5, 3]; // gentle rolling arpeggio (scale steps)
 
-  const SLOW = 0.40, FAST = 0.17;         // seconds/note — clamped range
+  const SLOW = 0.46, FAST = 0.26;         // seconds/note — gentle clamped range
 
   function hz(scaleStep) {
     const oct = Math.floor(scaleStep / SCALE.length);

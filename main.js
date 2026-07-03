@@ -15,6 +15,7 @@ import { createFarm, AVATAR_KEY } from './systems/farm.js';
 import { createRunner } from './systems/run.js';
 import { createWhack } from './systems/whack.js';
 import { createMusic } from './audio/music.js';
+import { createSfx } from './audio/sfx.js';
 import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
@@ -36,14 +37,27 @@ function onFarmTap(key) {
   if (key === AVATAR_KEY) openAvatar();
   else showCardFor(key);
 }
-const runner = createRunner($('run'), onRunDistance, onRunEnd);
+const runner = createRunner($('run'), onRunDistance, onRunEnd, onRunClear);
 const music = createMusic();
+const sfx = createSfx();
+const beep = (fn) => { if (state.settings.musicOn) fn(); };
 const whack = createWhack($('whack'), {
   getState: () => state,
-  onScore: () => {},                       // buddy auto-cheers on a timer
-  onIntensity: (p) => music.setIntensity(p),
+  onScore: (x, y) => { beep(() => sfx.smack()); beep(() => sfx.coin()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'whackHits', 1); },
+  onBomb: (x, y) => { beep(() => sfx.bomb()); floatPop(x, y, '✗', 'x'); },
+  onIntensity: (p) => music.setIntensity(Math.min(0.7, p * 0.55)), // gentle
   onEnd: (score) => endWhack(score),
 });
+
+/* Floating popup (coin ding / bomb X) at a page position. */
+function floatPop(px, py, text, cls) {
+  const el = document.createElement('div');
+  el.className = 'float-pop ' + cls;
+  el.textContent = text;
+  el.style.left = px + 'px'; el.style.top = py + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
 window.addEventListener('resize', () => { farm.resize(); runner.resize(); whack.resize(); });
 
 /* ============================================================
@@ -58,6 +72,7 @@ function enterMinigame() {
   $('dailyBanner').style.display = 'none';
   runActive = true;
   startBuddy();
+  sfx.resume();
   if (state.settings.musicOn) { music.start(); music.setIntensity(0); }
 }
 function exitMinigame() {
@@ -203,21 +218,27 @@ function startRun(idx) {
 }
 function onRunDistance(d) {
   $('dist').textContent = d;
-  music.setIntensity(Math.min(1, d / 450)); // speed up as the run goes on
+  music.setIntensity(Math.min(0.85, d / 2500)); // very gradual speed-up
+}
+// Each cleared obstacle: a coin, a ding, and a floating popup.
+function onRunClear(px, py) {
+  state.coins += 3;
+  addProgress(state, 'coins', 3);
+  syncCoins();
+  beep(() => sfx.coin());
+  floatPop(px, py, '+3 🪙', 'coin');
 }
 
-function onRunEnd(dist) {
+function onRunEnd(dist, clears) {
   const r = state.roster[activeRunIdx];
-  const gainedXP = Math.floor(dist * 0.6);
-  const gainedCoins = Math.floor(dist * 0.35);
-  state.coins += gainedCoins;
+  const gainedXP = Math.floor(dist * 0.4);       // reduced
+  const gainedCoins = clears * 3;                 // already credited live per clear
   const before = r.stage;
   r.xp += gainedXP;
   const after = stageFor(r.xp);
   const evolved = after > before;
   if (evolved) r.stage = after;
   addProgress(state, 'runDist', dist);
-  addProgress(state, 'coins', gainedCoins);
   addProgress(state, 'games', 1);
   farm.sync();
   persist();
