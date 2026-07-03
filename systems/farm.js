@@ -34,7 +34,7 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
   const ctx = canvas.getContext('2d');
   let FW = 0, FH = 0, ft = 0, raf = 0;
   let wanderers = [];
-  let stars = [], particles = [], tufts = [];
+  let stars = [], particles = [], tufts = [], clouds = [];
 
   function resize() {
     const r = canvas.getBoundingClientRect();
@@ -97,10 +97,29 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
       ctx.fillStyle = `rgba(255,255,255,${0.5 * tw})`; ctx.fillRect(s.x * FW, s.y * FH, 2, 2);
     }
   }
+  // A soft, puffy cloud built from overlapping blobs — drawn in the far
+  // background (behind the hills) and drifting slowly across the sky. Smaller,
+  // fainter, slower clouds read as further away (parallax depth).
+  function puff(x, y, s, a) {
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.beginPath();
+    ctx.ellipse(x,          y,          14 * s, 10 * s, 0, 0, 6.28);
+    ctx.ellipse(x + 16 * s, y + 3 * s,  18 * s, 12 * s, 0, 0, 6.28);
+    ctx.ellipse(x + 34 * s, y,          13 * s,  9 * s, 0, 0, 6.28);
+    ctx.ellipse(x + 17 * s, y - 8 * s,  14 * s, 11 * s, 0, 0, 6.28);
+    ctx.fill();
+    // brighter cap for a hint of sunlit volume
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, a + 0.15)})`;
+    ctx.beginPath();
+    ctx.ellipse(x + 15 * s, y - 9 * s, 11 * s, 7 * s, 0, 0, 6.28);
+    ctx.fill();
+  }
   function drawClouds() {
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    const cl = (ft * 8) % (FW + 80) - 40;
-    ctx.fillRect(cl, 46, 44, 10); ctx.fillRect(cl + 8, 38, 28, 10);
+    for (const c of clouds) {
+      c.x += c.spd;
+      if (c.x * FW > FW + 90 * c.s) c.x = -(90 * c.s) / FW;   // wrap off the right edge
+      puff(c.x * FW, c.y * FH, c.s, c.a);
+    }
   }
   function drawTree(x, y, b) {
     ctx.fillStyle = b.trunk; ctx.fillRect(x - 3, y - 12, 6, 16);
@@ -216,9 +235,9 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
     if (b.stars) drawStars();
     if (b.moon) drawMoon(b.sky[0]);
     if (b.sun) drawSun(b.sun);
+    if (b.clouds) drawClouds();               // farthest back — behind the hills
     hillBand(b.hillA, 0.5, 16, 0.15, 0);
     hillBand(b.hillB, HILL_FRONT, 12, 0.28, 2);
-    if (b.clouds) drawClouds();
     drawDecor(b);
     drawTufts();
 
@@ -277,11 +296,30 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
     if (!stars.length) for (let i = 0; i < 40; i++) stars.push({ x: Math.random(), y: Math.random() * 0.42, ph: Math.random() * 6.28 });
     if (!particles.length) for (let i = 0; i < 40; i++) particles.push({ x: Math.random(), y: Math.random(), ph: Math.random() * 6.28, spd: 0.4 + Math.random() });
     if (!tufts.length) for (let i = 0; i < 12; i++) tufts.push({ x: 0.08 + Math.random() * 0.84, y: Math.random() });
+    if (!clouds.length) for (let i = 0; i < 6; i++) {
+      const depth = Math.random();                       // 0 = near, 1 = far
+      clouds.push({
+        x: Math.random(),
+        y: 0.05 + Math.random() * 0.26,
+        s: 1.05 - depth * 0.6,                            // nearer clouds are bigger,
+        a: 0.82 - depth * 0.4,                            // …more opaque,
+        spd: (0.00042 - depth * 0.0003) * (0.8 + Math.random() * 0.5), // …and drift faster
+      });
+    }
     sync();
     canvas.addEventListener('pointerdown', onPointerDown);
     if (!raf) frame();
   }
   function stop() { cancelAnimationFrame(raf); raf = 0; canvas.removeEventListener('pointerdown', onPointerDown); }
 
-  return { start, stop, sync, resize };
+  /** Page-space rect around a building (for the how-to-play spotlight). */
+  function buildingRect(id) {
+    const bl = BUILDINGS.find((b) => b.id === id);
+    if (!bl) return null;
+    const r = canvas.getBoundingClientRect();
+    const cx = r.left + bl.x * r.width, cy = r.top + bl.y * r.height;
+    return { left: cx - 36, top: cy - 50, width: 72, height: 76 };
+  }
+
+  return { start, stop, sync, resize, buildingRect };
 }

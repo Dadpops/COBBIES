@@ -41,6 +41,7 @@
     <div class="top-right">
       <button class="iconbtn" id="challengesbtn" title="Challenges">⭐</button>
       <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
+      <button class="iconbtn" id="helpbtn" title="How to play">❓</button>
       <button class="iconbtn" id="settingsbtn" title="Settings">⚙️</button>
       <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
     </div>
@@ -61,6 +62,26 @@
     <canvas id="buddyCanvas" width="48" height="48"></canvas>
   </div>
 
+
+  <!-- HOW TO PLAY / GUIDED TUTORIAL (spotlight coach-marks) -->
+  <div class="screen" id="tutorialScreen">
+    <div class="tut-mask" id="tutMaskT"></div>
+    <div class="tut-mask" id="tutMaskB"></div>
+    <div class="tut-mask" id="tutMaskL"></div>
+    <div class="tut-mask" id="tutMaskR"></div>
+    <div class="tut-spot" id="tutSpot"></div>
+    <div class="tut-card" id="tutCard">
+      <div class="tut-emoji" id="tutEmoji">👋</div>
+      <h2 id="tutTitle">WELCOME</h2>
+      <p class="tut-body" id="tutBody">…</p>
+      <div class="tut-dots" id="tutDots"></div>
+      <div class="tut-nav">
+        <button class="btn ghost" id="tutPrev">‹ BACK</button>
+        <button class="btn" id="tutNext">NEXT ›</button>
+      </div>
+      <button class="tut-skip" id="tutSkip">SKIP TOUR</button>
+    </div>
+  </div>
 
   <!-- NAME ENTRY (first launch) -->
   <div class="screen center" id="nameScreen">

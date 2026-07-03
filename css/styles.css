@@ -435,3 +435,41 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 .title-start{margin-top:22px;font-size:12px;letter-spacing:.18em;color:#fff;font-weight:700;
   text-shadow:1px 1px 0 rgba(0,0,0,.3);animation:titlepulse 1.2s ease-in-out infinite}
 @keyframes titlepulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* ---- how to play / guided tutorial (spotlight coach-marks) ---- */
+#tutorialScreen{z-index:55;background:transparent;display:none}
+#tutorialScreen.show{display:block;animation:fade .3s ease}
+/* the spotlight: a transparent window whose giant box-shadow dims everything
+   else, with an accent ring around the highlighted element. It animates as it
+   travels from one target to the next. */
+/* four dark panels frame the highlighted rect (cheap, screenshot-friendly) */
+.tut-mask{position:absolute;background:rgba(18,24,32,.82);pointer-events:none;
+  transition:left .4s cubic-bezier(.4,0,.2,1),top .4s cubic-bezier(.4,0,.2,1),
+    width .4s cubic-bezier(.4,0,.2,1),height .4s cubic-bezier(.4,0,.2,1)}
+.tut-spot{position:absolute;border-radius:16px;pointer-events:none;
+  transition:left .4s cubic-bezier(.4,0,.2,1),top .4s cubic-bezier(.4,0,.2,1),
+    width .4s cubic-bezier(.4,0,.2,1),height .4s cubic-bezier(.4,0,.2,1)}
+.tut-spot::after{content:"";position:absolute;inset:-3px;border-radius:18px;
+  border:3px solid var(--accent);animation:spotpulse 1.4s ease-in-out infinite}
+.tut-spot.none::after{display:none}
+@keyframes spotpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.04)}}
+.tut-card{position:absolute;left:50%;transform:translateX(-50%);
+  background:var(--paper);border:3px solid var(--line);border-radius:20px;
+  padding:20px 20px 16px;display:flex;flex-direction:column;align-items:center;gap:11px;
+  box-shadow:5px 5px 0 rgba(0,0,0,.4);width:calc(100% - 36px);max-width:330px;
+  animation:pop .3s ease}
+.tut-card.center{top:50%;transform:translate(-50%,-50%)}
+.tut-emoji{font-size:46px;line-height:1;filter:drop-shadow(2px 3px 0 rgba(0,0,0,.15))}
+#tutorialScreen h2{color:var(--ink);padding:0;font-size:13px;letter-spacing:.16em}
+.tut-body{font-size:11px;line-height:1.65;letter-spacing:.03em;color:#6a5a3a;text-align:center}
+.tut-body b{color:var(--accent);letter-spacing:.04em}
+.tut-dots{display:flex;gap:6px;align-items:center;margin-top:2px}
+.tut-dots i{width:7px;height:7px;border-radius:50%;background:#d8c8a0;
+  transition:background .2s,transform .2s;display:block}
+.tut-dots i.on{background:var(--accent);transform:scale(1.35)}
+.tut-nav{display:flex;gap:10px;width:100%;justify-content:center}
+.tut-nav .btn{flex:1;padding:12px 10px;font-size:11px}
+.tut-nav .btn:disabled{opacity:.35;cursor:default}
+.tut-skip{background:none;border:none;color:#a99;font-family:inherit;
+  font-size:9px;letter-spacing:.14em;cursor:pointer;padding:2px}
+.tut-skip:active{color:var(--ink)}

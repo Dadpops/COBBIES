@@ -54,6 +54,7 @@ export function defaultState() {
     ownedHats: [],            // hats bought in the shop
     goalsClaimed: [],         // ids of completed+claimed goals
     unlockedBiomes: ['meadow'], // scenes unlocked via goals
+    tutorialSeen: false,        // first-launch "how to play" walkthrough
     settings: { musicOn: true, musicDynamic: true, volume: 0.7, track: 0, biome: 'meadow' },
   };
 }
