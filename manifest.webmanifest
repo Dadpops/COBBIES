@@ -1,0 +1,14 @@
+{
+  "name": "Cobbies — A Cozy Creature Ranch",
+  "short_name": "Cobbies",
+  "description": "Collect cute pixel critters, raise them, and build a cozy idle ranch.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#8ad0e8",
+  "theme_color": "#8ad0e8",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
