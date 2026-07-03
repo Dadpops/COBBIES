@@ -422,3 +422,16 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 
 /* ---- goal numeric progress ---- */
 .goal-prog{font-size:9px;color:#8a7a5a;letter-spacing:.06em;margin-top:4px;text-align:right}
+
+/* ---- title / splash screen ---- */
+.title-screen{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;cursor:pointer;
+  background:linear-gradient(180deg,#8ad0e8 0%,#bfe6f2 54%,#7cc46a 54%,#57a84a 100%)}
+.title-screen.show{display:flex;animation:fade .3s ease}
+.title-screen canvas{position:static;image-rendering:pixelated}
+#titleNora{width:200px;height:150px}
+#titleWord{width:340px;height:83px;max-width:90%}
+.title-tag{font-size:11px;letter-spacing:.22em;color:#356a35;font-weight:700;margin-top:4px}
+.title-start{margin-top:22px;font-size:12px;letter-spacing:.18em;color:#fff;font-weight:700;
+  text-shadow:1px 1px 0 rgba(0,0,0,.3);animation:titlepulse 1.2s ease-in-out infinite}
+@keyframes titlepulse{0%,100%{opacity:.5}50%{opacity:1}}
