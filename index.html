@@ -26,6 +26,19 @@
     <div class="dlg-bubble"><span id="dlgText">…</span></div>
   </div>
 
+  <!-- Daily challenge banner (main menu) -->
+  <button id="dailyBanner" class="daily">
+    <span class="daily-star">⭐</span>
+    <span class="daily-txt"><b id="dailyText">—</b><span id="dailyProg" class="daily-prog"></span></span>
+    <span id="dailyClaim" class="daily-claim">CLAIM</span>
+  </button>
+
+  <!-- Cheerleader buddy widget (shown during minigames) -->
+  <div id="buddyBox" class="buddybox">
+    <div class="buddy-bubble" id="buddyBubble">Go!</div>
+    <canvas id="buddyCanvas" width="48" height="48"></canvas>
+  </div>
+
   <div id="farmbtns">
     <button class="btn ghost" id="dexbtn">📖 DEX</button>
     <button class="btn sec" id="hatchbtn">🥚 HATCH</button>
@@ -39,6 +52,33 @@
     <p class="intro">Welcome to the ranch. What should I call you?</p>
     <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
     <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- MINIGAME HUB -->
+  <div class="screen center" id="hubScreen">
+    <button class="backbtn" id="hubBack">‹</button>
+    <h2>PICK A GAME</h2>
+    <p class="intro">Every game grows your cobbies.</p>
+    <div id="hubCards">
+      <button class="hub-card" id="hubRun">
+        <span class="hub-emoji">🏃</span>
+        <span class="hub-info"><b>RUNNER</b><span>One-tap jump · distance = XP + coins</span></span>
+      </button>
+      <button class="hub-card" id="hubWhack">
+        <span class="hub-emoji">🔨</span>
+        <span class="hub-info"><b>WHACK-A-COBBIE</b><span>Bonk the pop-ups · 30s, speeds up</span></span>
+      </button>
+    </div>
+    <button class="hub-buddy" id="hubBuddy">📣 BUDDY: <b id="hubBuddyName">NORA</b> · CHANGE ›</button>
+    <button class="hub-buddy" id="musicToggle">🔊 MUSIC: ON</button>
+  </div>
+
+  <!-- BUDDY SELECT -->
+  <div class="screen" id="buddyScreen">
+    <button class="backbtn" id="buddyBack">‹</button>
+    <h2>CHOOSE A CHEERLEADER</h2>
+    <div class="sub">THEY CHEER YOU ON FROM THE SIDELINE</div>
+    <div id="buddyGrid"></div>
   </div>
 
   <!-- ROSTER SELECT -->
@@ -76,6 +116,7 @@
 
   <!-- RUN -->
   <canvas id="run" style="display:none"></canvas>
+  <canvas id="whack" style="display:none"></canvas>
   <div id="runhud">
     <div class="hud-dist"><span class="hud-lbl">DISTANCE</span><span id="dist">0</span></div>
     <div class="hud-dist"><span class="hud-lbl">RUNNER</span><span id="runnerName">—</span></div>
@@ -118,7 +159,7 @@
     <div class="rc">
       <canvas id="resCanvas" width="96" height="96"></canvas>
       <div class="line" id="resName">—</div>
-      <div class="line">Distance <b id="resDist">0</b>m</div>
+      <div class="line" id="resStat">Distance <b id="resDist">0</b>m</div>
       <div class="line gain" id="resXP">+0 XP</div>
       <div class="line" style="color:#c8a030;font-weight:700" id="resCoins">+0 🪙</div>
     </div>

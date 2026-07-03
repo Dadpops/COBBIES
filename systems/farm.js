@@ -197,18 +197,24 @@ export function createFarm(canvas, getState, onPick) {
     drawBarn();
     drawTufts();
 
-    // wanderers roam the flat green, drawn back-to-front by y
+    // wanderers roam the flat green, drawn back-to-front by y with a gentle
+    // size-by-distance scale so nearer critters read as closer.
     const sorted = [...wanderers].sort((a, c) => a.y - c.y);
     for (const w of sorted) {
       w.x += (w.tx - w.x) * 0.006; w.y += (w.ty - w.y) * 0.006;
       if (Math.hypot(w.tx - w.x, w.ty - w.y) < 0.02) { w.tx = randX(); w.ty = randY(); }
       const { px, py } = screenPos(w.x, w.y);
       const bob = Math.abs(Math.sin(ft * 4 + w.ph)) * 3;
+      const depth = (w.y - BAND_TOP) / (BAND_BOTTOM - BAND_TOP);
+      const s = 0.82 + 0.34 * depth;
       ctx.fillStyle = 'rgba(0,0,0,.16)';
-      ctx.beginPath(); ctx.ellipse(px, py, 15, 5, 0, 0, 6.28); ctx.fill();
-      if (w.avatar) drawAvatar(ctx, getState().avatar, px - 24, py - 46 - bob, 3);
+      ctx.beginPath(); ctx.ellipse(px, py, 15 * s, 5 * s, 0, 0, 6.28); ctx.fill();
+      ctx.save();
+      ctx.translate(px, py); ctx.scale(s, s);
+      if (w.avatar) drawAvatar(ctx, getState().avatar, -24, -46 - bob, 3);
       else drawPix(ctx, CRITTERS[w.key].stages[w.stage], PALS[CRITTERS[w.key].type],
-        px - 24, py - 44 - bob, 3);
+        -24, -44 - bob, 3);
+      ctx.restore();
     }
 
     if (b.particle) drawParticles(b.particle);

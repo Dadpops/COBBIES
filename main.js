@@ -13,6 +13,9 @@ import { lineFor } from './data/dialogue.js';
 import * as Save from './systems/save.js';
 import { createFarm, AVATAR_KEY } from './systems/farm.js';
 import { createRunner } from './systems/run.js';
+import { createWhack } from './systems/whack.js';
+import { createMusic } from './audio/music.js';
+import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
 } from './systems/hatch.js';
@@ -34,7 +37,38 @@ function onFarmTap(key) {
   else showCardFor(key);
 }
 const runner = createRunner($('run'), onRunDistance, onRunEnd);
-window.addEventListener('resize', () => { farm.resize(); runner.resize(); });
+const music = createMusic();
+const whack = createWhack($('whack'), {
+  getState: () => state,
+  onScore: () => {},                       // buddy auto-cheers on a timer
+  onIntensity: (p) => music.setIntensity(p),
+  onEnd: (score) => endWhack(score),
+});
+window.addEventListener('resize', () => { farm.resize(); runner.resize(); whack.resize(); });
+
+/* ============================================================
+   MINIGAME LIFECYCLE — shared chrome for both games: hide the
+   farm UI, summon the cheerleader buddy, start the music.
+   ============================================================ */
+let runActive = false;
+function enterMinigame() {
+  $('farmbtns').style.display = 'none';
+  document.querySelector('.topbar').style.display = 'none';
+  $('dialogue').classList.remove('show');
+  $('dailyBanner').style.display = 'none';
+  runActive = true;
+  startBuddy();
+  if (state.settings.musicOn) { music.start(); music.setIntensity(0); }
+}
+function exitMinigame() {
+  $('farmbtns').style.display = 'flex';
+  document.querySelector('.topbar').style.display = '';
+  $('dailyBanner').style.display = '';
+  runActive = false;
+  stopBuddy();
+  music.stop();
+  renderDailyBanner();
+}
 
 /* ---------- coin display ---------- */
 function syncCoins() {
@@ -47,6 +81,9 @@ function syncCoins() {
    ============================================================ */
 function boot() {
   farm.start();
+  ensureDaily(state);
+  persist();
+  renderDailyBanner();
   syncCoins();
   if (!state.playerName) {
     const ctx = $('noraIntro').getContext('2d');
@@ -96,30 +133,78 @@ function showDialogue() {
 }
 
 /* ============================================================
-   ROSTER SELECT → RUN
+   MINIGAME HUB — PLAY opens a picker (Runner / Whack) with the
+   cheerleader-buddy selector and a music toggle.
    ============================================================ */
-$('playbtn').addEventListener('click', () => {
+$('playbtn').addEventListener('click', openHub);
+$('hubBack').addEventListener('click', () => $('hubScreen').classList.remove('show'));
+function openHub() {
+  updateHubBuddyName();
+  updateMusicToggle();
+  $('hubScreen').classList.add('show');
+}
+$('hubRun').addEventListener('click', () => {
   renderRoster($('roster'), state.roster, startRun);
   $('rosterScreen').classList.add('show');
 });
+$('hubWhack').addEventListener('click', startWhack);
 $('rosterBack').addEventListener('click', () => $('rosterScreen').classList.remove('show'));
 
+/* ---------- cheerleader buddy selection ---------- */
+$('hubBuddy').addEventListener('click', openBuddySelect);
+$('buddyBack').addEventListener('click', () => $('buddyScreen').classList.remove('show'));
+function updateHubBuddyName() {
+  const b = state.roster.find((r) => r.key === state.buddy) || state.roster[0];
+  $('hubBuddyName').textContent = displayName(b);
+}
+function openBuddySelect() {
+  const grid = $('buddyGrid');
+  grid.innerHTML = '';
+  for (const r of state.roster) {
+    const cd = CRITTERS[r.key];
+    const cell = document.createElement('div');
+    cell.className = 'dcell' + (state.buddy === r.key ? ' active' : '');
+    cell.innerHTML = `<canvas width="48" height="48"></canvas><div class="dname">${displayName(r)}</div>`;
+    grid.appendChild(cell);
+    drawPix(cell.querySelector('canvas').getContext('2d'), cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
+    cell.addEventListener('click', () => {
+      state.buddy = r.key; persist(); updateHubBuddyName(); openBuddySelect();
+    });
+  }
+  $('buddyScreen').classList.add('show');
+}
+
+/* ---------- music toggle ---------- */
+$('musicToggle').addEventListener('click', () => {
+  state.settings.musicOn = !state.settings.musicOn;
+  persist();
+  updateMusicToggle();
+  if (!state.settings.musicOn) music.stop();
+  else if (runActive) music.start();
+});
+function updateMusicToggle() {
+  $('musicToggle').textContent = state.settings.musicOn ? '🔊 MUSIC: ON' : '🔇 MUSIC: OFF';
+}
+
+/* ============================================================
+   RUNNER
+   ============================================================ */
 let activeRunIdx = -1;
-let runActive = false;
 function startRun(idx) {
   activeRunIdx = idx;
   const r = state.roster[idx];
   $('rosterScreen').classList.remove('show');
+  $('hubScreen').classList.remove('show');
   $('run').style.display = 'block';
   $('runhud').classList.add('show');
-  $('farmbtns').style.display = 'none';
-  document.querySelector('.topbar').style.display = 'none';
-  $('dialogue').classList.remove('show');
-  runActive = true;
   $('runnerName').textContent = displayName(r);
+  enterMinigame();
   runner.start({ key: r.key, stage: r.stage });
 }
-function onRunDistance(d) { $('dist').textContent = d; }
+function onRunDistance(d) {
+  $('dist').textContent = d;
+  music.setIntensity(Math.min(1, d / 450)); // speed up as the run goes on
+}
 
 function onRunEnd(dist) {
   const r = state.roster[activeRunIdx];
@@ -131,6 +216,9 @@ function onRunEnd(dist) {
   const after = stageFor(r.xp);
   const evolved = after > before;
   if (evolved) r.stage = after;
+  addProgress(state, 'runDist', dist);
+  addProgress(state, 'coins', gainedCoins);
+  addProgress(state, 'games', 1);
   farm.sync();
   persist();
   syncCoins();
@@ -139,7 +227,7 @@ function onRunEnd(dist) {
   const cd = CRITTERS[r.key];
   $('resTitle').textContent = 'RUN COMPLETE';
   $('resName').textContent = `${displayName(r)} · ${cd.stageNames[r.stage]}`;
-  $('resDist').textContent = dist;
+  $('resStat').innerHTML = `Distance <b>${dist}</b>m`;
   $('resXP').textContent = '+' + gainedXP + ' XP';
   $('resCoins').textContent = '+' + gainedCoins + ' 🪙';
   const rc = $('resCanvas').getContext('2d');
@@ -155,16 +243,88 @@ let pendingEvolve = null;
 $('resContinue').addEventListener('click', () => {
   $('results').classList.remove('show');
   $('run').style.display = 'none';
+  $('whack').style.display = 'none';
   $('runhud').classList.remove('show');
-  $('farmbtns').style.display = 'flex';
-  document.querySelector('.topbar').style.display = '';
-  runActive = false;
   runner.stop();
+  whack.stop();
+  exitMinigame();
   if (pendingEvolve) {
     showEvolution(pendingEvolve);
     pendingEvolve = null;
   }
 });
+
+/* ============================================================
+   WHACK-A-COBBIE — creatures pop from holes; bonk them. Earns
+   coins + XP for the chosen buddy. Difficulty ramps over 30s.
+   ============================================================ */
+function startWhack() {
+  $('hubScreen').classList.remove('show');
+  $('whack').style.display = 'block';
+  enterMinigame();
+  whack.start();
+}
+function endWhack(score) {
+  const coins = score * 3;
+  const xp = score * 4;
+  state.coins += coins;
+  const buddy = state.roster.find((r) => r.key === state.buddy) || state.roster[0];
+  const before = buddy.stage;
+  buddy.xp += xp;
+  const after = stageFor(buddy.xp);
+  const evolved = after > before;
+  if (evolved) buddy.stage = after;
+  addProgress(state, 'coins', coins);
+  addProgress(state, 'games', 1);
+  farm.sync();
+  persist();
+  syncCoins();
+
+  const cd = CRITTERS[buddy.key];
+  $('resTitle').textContent = "TIME'S UP!";
+  $('resName').textContent = `${displayName(buddy)} · ${cd.stageNames[buddy.stage]}`;
+  $('resStat').innerHTML = `<b>${score}</b> bonks`;
+  $('resXP').textContent = '+' + xp + ' XP';
+  $('resCoins').textContent = '+' + coins + ' 🪙';
+  const rc = $('resCanvas').getContext('2d');
+  rc.clearRect(0, 0, 96, 96);
+  drawCentered(rc, cd.stages[buddy.stage], PALS[cd.type], 96, 6);
+  setTimeout(() => $('results').classList.add('show'), 300);
+  pendingEvolve = evolved ? { key: buddy.key, before, after } : null;
+}
+
+/* ============================================================
+   CHEERLEADER BUDDY — bounces on the sideline and cheers during
+   any minigame. Draws the chosen buddy creature + a speech pop.
+   ============================================================ */
+let buddyRaf = 0, buddyNextCheer = 0;
+const CHEERS = ['Go go go!', 'Nice!', 'You got this!', 'Woohoo!', 'Amazing!', 'Keep it up!', "Let's go!"];
+function startBuddy() {
+  $('buddyBox').classList.add('show');
+  buddyNextCheer = performance.now() + 1200;
+  if (!buddyRaf) buddyLoop();
+}
+function buddyLoop() {
+  const now = performance.now();
+  const cd = CRITTERS[state.buddy] || CRITTERS.nora;
+  const owned = state.roster.find((r) => r.key === state.buddy);
+  const c = $('buddyCanvas').getContext('2d');
+  c.clearRect(0, 0, 48, 48);
+  const bob = Math.abs(Math.sin(now / 130)) * 4; // excited hopping
+  drawPix(c, cd.stages[owned ? owned.stage : 0], PALS[cd.type], 0, 4 - bob, 3);
+  if (now > buddyNextCheer) {
+    $('buddyBubble').textContent = CHEERS[(Math.random() * CHEERS.length) | 0];
+    $('buddyBubble').classList.add('show');
+    setTimeout(() => $('buddyBubble').classList.remove('show'), 1400);
+    buddyNextCheer = now + 2600 + Math.random() * 1600;
+  }
+  buddyRaf = requestAnimationFrame(buddyLoop);
+}
+function stopBuddy() {
+  cancelAnimationFrame(buddyRaf); buddyRaf = 0;
+  $('buddyBox').classList.remove('show');
+  $('buddyBubble').classList.remove('show');
+}
 
 /* ============================================================
    EVOLUTION — a dedicated reveal moment (mirrors the hatch beat).
@@ -311,6 +471,7 @@ function revealHatch(result) {
   if (result.pityTriggered) {
     tag.innerHTML += `<div class="hpity">✦ PITY REWARD ✦</div>`;
   }
+  if (!result.isDupe) { addProgress(state, 'hatch', 1); persist(); renderDailyBanner(); }
   farm.sync();
   $('hatchReveal').classList.add('show');
   $('hatchDone').style.display = 'block';
@@ -391,6 +552,28 @@ function commitRename() {
 $('renameSave').addEventListener('click', commitRename);
 $('renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') commitRename(); });
 $('renameCancel').addEventListener('click', () => $('renameModal').classList.remove('show'));
+
+/* ============================================================
+   DAILY CHALLENGE — one rotating goal per day, fed by the games.
+   ============================================================ */
+$('dailyBanner').addEventListener('click', () => {
+  const d = getDaily(state);
+  if (d.done && !d.claimed) {
+    const reward = claimDaily(state);
+    if (reward) { state.coins += reward; persist(); syncCoins(); }
+    renderDailyBanner();
+  }
+});
+function renderDailyBanner() {
+  const d = ensureDaily(state);
+  $('dailyText').textContent = d.text;
+  $('dailyProg').textContent = d.claimed
+    ? 'Done for today ✓'
+    : d.done ? 'Complete · tap to claim' : `${d.progress} / ${d.target}`;
+  $('dailyClaim').textContent = `+${d.reward}🪙`;
+  $('dailyBanner').classList.toggle('done', d.done && !d.claimed);
+  $('dailyBanner').classList.toggle('claimed', d.claimed);
+}
 
 /* ---------- go ---------- */
 boot();

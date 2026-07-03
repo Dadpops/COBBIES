@@ -9,6 +9,7 @@
 // char -> palette index
 const LEG = { '.':0,'k':1,'s':2,'d':3,'h':4,'g':5,'c':6,'v':7,'e':8,'a':9,'b':10,'m':11 };
 
+// Head is centred on cols 3-12 (skin 4-11); everything else lines up to it.
 const HEAD = [
   '................',
   '................',
@@ -18,7 +19,7 @@ const HEAD = [
   '...kssssssssk...',
   '...ksssmmsssk...',
   '...kdssssssdk...',
-  '....kssssk......',
+  '.....kssssk.....',
 ];
 
 // Lower-body variants (rows 0-8 empty so they overlay the head at same origin).
@@ -27,11 +28,11 @@ const BODIES = {
     '................','................','................',
     '................','................','................',
     '................','................','................',
-    '..kcccccccck....',
-    '..kcccccccck....',
-    '..kcccccccck....',
-    '..kcccccccck....',
-    '..kcccccccck....',
+    '...kcccccccck...',
+    '...kcccccccck...',
+    '...kcccccccck...',
+    '...kcccccccck...',
+    '...kcccccccck...',
     '...kvvk..kvvk...',
     '...kvvk..kvvk...',
     '................',
@@ -40,46 +41,47 @@ const BODIES = {
     '................','................','................',
     '................','................','................',
     '................','................','................',
-    '..kcccccccck....',
-    '..kcccccccck....',
-    '..kcccccccck....',
-    '.kvvvvvvvvvvk...',
-    'kvvvvvvvvvvvvk..',
-    'kvvvvvvvvvvvvk..',
-    '..kk....kk......',
+    '...kcccccccck...',
+    '...kcccccccck...',
+    '...kcccccccck...',
+    '..kvvvvvvvvvvk..',
+    '.kvvvvvvvvvvvvk.',
+    '.kvvvvvvvvvvvvk.',
+    '....kk....kk....',
     '................',
   ],
 };
 
+// Hair sits on the crown (rows 1-3+), symmetric about the head centre.
 const HAIR = {
   none: [],
   short: [
     '................',
-    '...hhhhhhhhh....',
-    '..hhhhhhhhhhh...',
-    '..hh......hh....',
+    '...hhhhhhhhhh...',
+    '..hhhhhhhhhhhh..',
+    '...hh......hh...',
   ],
   long: [
     '................',
-    '..hhhhhhhhhhh...',
-    '..hhhhhhhhhhh...',
-    '..hh......hh....',
-    '..hh......hh....',
-    '..hh......hh....',
-    '..hhh....hhh....',
-    '...hh....hh.....',
+    '...hhhhhhhhhh...',
+    '..hhhhhhhhhhhh..',
+    '..hh........hh..',
+    '..hh........hh..',
+    '..hh........hh..',
+    '..hh........hh..',
+    '...hh......hh...',
   ],
   spiky: [
     '...h.h.h.h.h....',
-    '..hhhhhhhhhhh...',
-    '..hhhhhhhhhhh...',
-    '..hh......hh....',
+    '...hhhhhhhhhh...',
+    '..hhhhhhhhhhhh..',
+    '...hh......hh...',
   ],
   bun: [
-    '.....hhh........',
-    '...hhhhhhhhh....',
-    '..hhhhhhhhhhh...',
-    '..hh......hh....',
+    '......hhhh......',
+    '...hhhhhhhhhh...',
+    '..hhhhhhhhhhhh..',
+    '...hh......hh...',
   ],
 };
 
@@ -87,19 +89,20 @@ const HATS = {
   none: [],
   cap: [
     '................',
-    '..aaaaaaaaaa....',
-    '.baaaaaaaaaab...',
+    '...aaaaaaaaaa...',
+    '..aaaaaaaaaaaa..',
+    '.bbbbbbbbbbbbbb.',
   ],
   flower: [
     '...a.a..........',
-    '..abaa..........',
+    '..ababa.........',
     '...a.a..........',
   ],
   band: [
     '................',
     '................',
     '................',
-    '..bbbbbbbbbbb...',
+    '..bbbbbbbbbbbb..',
   ],
 };
 

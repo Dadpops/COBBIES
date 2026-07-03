@@ -53,7 +53,7 @@ export function createRunner(canvas, onDistance, onEnd) {
   function loop() {
     if (!run) { raf = 0; return; }
     run.t += 0.016;
-    if (run.speed < 6.5) run.speed += 0.0006; // capped ramp
+    if (run.speed < 6.8) run.speed += 0.0016; // steadily speeds up, then caps
     run.dist += run.speed * 0.5;
 
     // coyote time: brief window to still jump just after leaving the ground

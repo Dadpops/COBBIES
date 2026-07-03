@@ -45,7 +45,9 @@ export function defaultState() {
     roster,
     pity: 0,
     avatar: defaultAvatar(),
-    settings: { muted: false, biome: 'meadow' },
+    buddy: 'nora',
+    daily: null, // filled in by ensureDaily() on boot
+    settings: { musicOn: true, biome: 'meadow' },
   };
 }
 
