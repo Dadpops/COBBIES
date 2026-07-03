@@ -9,7 +9,7 @@
 // char -> palette index
 const LEG = { '.':0,'k':1,'s':2,'d':3,'h':4,'g':5,'c':6,'v':7,'e':8,'a':9,'b':10,'m':11 };
 
-const BASE = [
+const HEAD = [
   '................',
   '................',
   '...kkkkkkkkkk...',
@@ -19,14 +19,37 @@ const BASE = [
   '...ksssmmsssk...',
   '...kdssssssdk...',
   '....kssssk......',
-  '..kcccccccck....',
-  '..kcccccccck....',
-  '..kcccccccck....',
-  '..kcccccccck....',
-  '..kcccccccck....',
-  '...kvvk..kvvk...',
-  '...kvvk..kvvk...',
 ];
+
+// Lower-body variants (rows 0-8 empty so they overlay the head at same origin).
+const BODIES = {
+  pants: [
+    '................','................','................',
+    '................','................','................',
+    '................','................','................',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '...kvvk..kvvk...',
+    '...kvvk..kvvk...',
+    '................',
+  ],
+  dress: [
+    '................','................','................',
+    '................','................','................',
+    '................','................','................',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '..kcccccccck....',
+    '.kvvvvvvvvvvk...',
+    'kvvvvvvvvvvvvk..',
+    'kvvvvvvvvvvvvk..',
+    '..kk....kk......',
+    '................',
+  ],
+};
 
 const HAIR = {
   none: [],
@@ -81,6 +104,10 @@ const HATS = {
 };
 
 export const AVATAR_OPTIONS = {
+  bodies: [
+    { name: 'PANTS', key: 'pants' },
+    { name: 'DRESS', key: 'dress' },
+  ],
   skins: [
     { name: 'FAIR', c: '#f4c8a0', d: '#dca880' },
     { name: 'WARM', c: '#e0a072', d: '#c68858' },
@@ -115,7 +142,7 @@ export const AVATAR_OPTIONS = {
 
 /** A fresh default look. */
 export function defaultAvatar() {
-  return { skin: 0, hairColor: 0, hairStyle: 0, outfit: 1, hat: 0 };
+  return { body: 0, skin: 0, hairColor: 0, hairStyle: 0, outfit: 1, hat: 0 };
 }
 
 function paletteFor(sel) {
@@ -149,7 +176,9 @@ function drawLayer(ctx, rows, pal, ox, oy, cell) {
  */
 export function drawAvatar(ctx, sel, ox, oy, cell) {
   const pal = paletteFor(sel);
-  drawLayer(ctx, BASE, pal, ox, oy, cell);
+  const body = AVATAR_OPTIONS.bodies[sel.body] || AVATAR_OPTIONS.bodies[0];
+  drawLayer(ctx, BODIES[body.key] || BODIES.pants, pal, ox, oy, cell);
+  drawLayer(ctx, HEAD, pal, ox, oy, cell);
   const styleName = AVATAR_OPTIONS.hairStyles[sel.hairStyle] || 'short';
   drawLayer(ctx, HAIR[styleName] || [], pal, ox, oy, cell);
   const hat = AVATAR_OPTIONS.hats[sel.hat] || AVATAR_OPTIONS.hats[0];

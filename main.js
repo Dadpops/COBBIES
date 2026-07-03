@@ -192,9 +192,13 @@ $('evoDone').addEventListener('click', () => $('evolve').classList.remove('show'
 $('hatchbtn').addEventListener('click', openHatchMenu);
 $('hatchMenuBack').addEventListener('click', () => $('hatchMenu').classList.remove('show'));
 
+function remainingToFind() {
+  const owned = new Set(state.roster.map((r) => r.key));
+  return HATCH_POOL.filter((k) => !owned.has(k)).length;
+}
 function openHatchMenu() {
   updatePityHint();
-  $('eggRandom').disabled = state.coins < EGG_COST;
+  $('eggRandom').disabled = state.coins < EGG_COST || remainingToFind() === 0;
   $('eggDirect').disabled = state.coins < DIRECT_COST;
   $('eggRandom').textContent = `🥚 RANDOM EGG · ${EGG_COST}`;
   $('eggDirect').textContent = `🎯 PICK A CRITTER · ${DIRECT_COST}`;
@@ -203,16 +207,22 @@ function openHatchMenu() {
   $('hatchMenu').classList.add('show');
 }
 function updatePityHint() {
+  const remaining = remainingToFind();
+  if (remaining === 0) {
+    $('pityHint').textContent = "You've collected every cobbie! 🎉";
+    return;
+  }
   const left = PITY_LIMIT - state.pity;
   $('pityHint').textContent =
     left <= 3
       ? `A legendary is guaranteed within ${left} egg${left === 1 ? '' : 's'}!`
-      : 'A random egg could be anyone…';
+      : `A random egg is always someone new — ${remaining} left to find.`;
 }
 
 $('eggRandom').addEventListener('click', () => {
   const result = hatchEgg(state);
   if (!result) return;
+  if (result.allCollected) { updatePityHint(); $('eggRandom').disabled = true; return; }
   persist(); syncCoins();
   $('hatchMenu').classList.remove('show');
   playHatchAnimation(result);

@@ -146,6 +146,7 @@ export function renderAvatarEditor(container, sel, onChange) {
     container.appendChild(row);
   };
 
+  textRow('BODY', 'body', O.bodies.map((x) => x.name));
   colorRow('SKIN', 'skin', O.skins);
   textRow('HAIR', 'hairStyle', O.hairStyles);
   colorRow('COLOR', 'hairColor', O.hairColors);

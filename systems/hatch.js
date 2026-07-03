@@ -27,18 +27,22 @@ export const PITY_LIMIT = 10; // random eggs without a legendary -> forced
  * @property {number} awardedXP    XP given to the existing creature if dupe
  */
 
-/** Weighted-random species from the hatch pool, honouring the pity rule. */
+/**
+ * Weighted-random species drawn ONLY from creatures the player doesn't own
+ * yet, honouring the pity rule. A random egg is always a new friend — never
+ * a duplicate. Returns { key: null } once everything hatchable is collected.
+ */
 function rollSpecies(state) {
+  const owned = new Set(state.roster.map((r) => r.key));
+  const pool = HATCH_POOL.filter((k) => !owned.has(k));
+  if (!pool.length) return { key: null, pityTriggered: false };
+
   if (state.pity >= PITY_LIMIT - 1) {
-    const legendaries = HATCH_POOL.filter(
-      (k) => CRITTERS[k].rarity === 'legendary'
-    );
-    if (legendaries.length) {
-      return { key: pick(legendaries), pityTriggered: true };
-    }
+    const legendaries = pool.filter((k) => CRITTERS[k].rarity === 'legendary');
+    if (legendaries.length) return { key: pick(legendaries), pityTriggered: true };
   }
   const weighted = [];
-  for (const key of HATCH_POOL) {
+  for (const key of pool) {
     const w = RARITY[CRITTERS[key].rarity]?.weight ?? 1;
     for (let i = 0; i < w; i++) weighted.push(key);
   }
@@ -55,9 +59,10 @@ function pick(arr) {
  */
 export function hatchEgg(state) {
   if (state.coins < EGG_COST) return null;
-  state.coins -= EGG_COST;
   const { key, pityTriggered } = rollSpecies(state);
+  if (!key) return { allCollected: true }; // nothing new — don't charge
 
+  state.coins -= EGG_COST;
   // Pity tracking: reset on a legendary, otherwise advance.
   if (CRITTERS[key].rarity === 'legendary') state.pity = 0;
   else state.pity += 1;

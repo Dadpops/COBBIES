@@ -26,12 +26,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 .iconbtn:active{transform:translateY(2px)}
 
 /* ---- avatar creator ---- */
-#avatarScreen{justify-content:flex-start;padding-top:56px;gap:12px}
-#avatarPreview{image-rendering:pixelated;width:128px;height:128px;
+#avatarScreen{align-items:center;justify-content:flex-start;
+  overflow-y:auto;padding:52px 16px 28px;gap:12px}
+#avatarPreview{position:static;image-rendering:pixelated;width:120px;height:120px;flex-shrink:0;
   background:linear-gradient(180deg,#6fc0e8,#a6ddef 60%,#8fd07a 60%,#4fa85f);
   border:3px solid var(--line);border-radius:14px}
-#avatarOptions{width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px;
-  overflow-y:auto;padding:4px 4px 8px}
+#avatarOptions{width:100%;max-width:340px;display:flex;flex-direction:column;gap:11px}
 .av-row{display:flex;flex-direction:column;gap:5px}
 .av-label{font-size:9px;letter-spacing:.16em;color:#9ab;font-weight:700}
 .av-opts{display:flex;flex-wrap:wrap;gap:7px}
