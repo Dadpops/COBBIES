@@ -16,8 +16,9 @@ import { createRunner } from './systems/run.js';
 import { createWhack } from './systems/whack.js';
 import { createMusic, TRACKS } from './audio/music.js';
 import { createSfx } from './audio/sfx.js';
-import { HAT_LIST } from './data/cosmetics.js';
-import { drawCritter } from './render/critter.js';
+import { HAT_LIST, HATS } from './data/cosmetics.js';
+import { drawCritter, drawCritterCentered } from './render/critter.js';
+import { GOALS, goalProgress, goalDone, goalClaimed, rewardText, claimGoal, anyGoalClaimable } from './systems/quests.js';
 import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
@@ -188,11 +189,12 @@ function openHub() {
   updateMusicToggle();
   $('hubScreen').classList.add('show');
 }
-$('hubRun').addEventListener('click', () => {
-  renderRoster($('roster'), state.roster, startRun);
+$('hubRun').addEventListener('click', () => openRosterFor(startRun));
+$('hubWhack').addEventListener('click', () => openRosterFor(startWhackWith));
+function openRosterFor(onPick) {
+  renderRoster($('roster'), state.roster, onPick);
   $('rosterScreen').classList.add('show');
-});
-$('hubWhack').addEventListener('click', startWhack);
+}
 $('rosterBack').addEventListener('click', () => $('rosterScreen').classList.remove('show'));
 
 /* ---------- cheerleader buddy selection ---------- */
@@ -302,8 +304,36 @@ function jobsHandlers() {
     onExpand: () => { if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); refreshJobs(); } },
   };
 }
-function refreshJobs() { renderStations($('jobsList'), state, Date.now(), jobsHandlers()); }
+function refreshJobs() { renderStations($('jobsList'), state, Date.now(), jobsHandlers()); drawBarnScene(); }
 function openJobs() { refreshJobs(); $('jobsScreen').classList.add('show'); }
+
+// A little barn interior showing the critters currently on the job.
+function drawBarnScene() {
+  const cv = $('barnScene'); const c = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#8a5a34'); g.addColorStop(1, '#6a4424');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 2;
+  for (let y = 16; y < H - 30; y += 18) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  c.fillStyle = '#c8a86a'; c.fillRect(0, H - 30, W, 30);
+  c.fillStyle = '#b89858'; c.fillRect(0, H - 30, W, 4);
+  c.fillStyle = '#e8c86a'; c.fillRect(12, H - 42, 26, 12); c.fillRect(W - 42, H - 40, 28, 10);
+
+  const workers = STATIONS.map((st) => state.stations[st.id]).filter((s) => s && s.key);
+  if (!workers.length) {
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.font = '11px ui-monospace, monospace';
+    c.textAlign = 'center'; c.fillText('No critters working yet — station some below!', W / 2, H - 46);
+    return;
+  }
+  workers.forEach((s, i) => {
+    const o = state.roster.find((r) => r.key === s.key);
+    const bx = workers.length === 1 ? W * 0.5 : W * (0.22 + 0.56 * (i / (workers.length - 1)));
+    c.fillStyle = 'rgba(0,0,0,.18)';
+    c.beginPath(); c.ellipse(bx, H - 26, 18, 5, 0, 0, 6.28); c.fill();
+    drawCritter(c, s.key, o ? o.stage : 0, o ? o.hat : null, bx - 24, H - 74, 3);
+  });
+}
 
 /* ---------- generic creature picker ---------- */
 $('pickerBack').addEventListener('click', () => $('pickerScreen').classList.remove('show'));
@@ -360,6 +390,7 @@ function onRunEnd(dist, clears) {
   if (evolved) r.stage = after;
   addProgress(state, 'runDist', dist);
   addProgress(state, 'games', 1);
+  state.stats.games++; state.stats.runBest = Math.max(state.stats.runBest, dist); // goals
   farm.sync();
   persist();
   syncCoins();
@@ -373,7 +404,7 @@ function onRunEnd(dist, clears) {
   $('resCoins').textContent = '+' + gainedCoins + ' 🪙';
   const rc = $('resCanvas').getContext('2d');
   rc.clearRect(0, 0, 96, 96);
-  drawCentered(rc, cd.stages[r.stage], PALS[cd.type], 96, 6);
+  drawCritterCentered(rc, r.key, r.stage, r.hat, 96, 6);
   setTimeout(() => $('results').classList.add('show'), 300);
 
   // …then, if it evolved, a dedicated reveal after the player continues.
@@ -399,39 +430,44 @@ $('resContinue').addEventListener('click', () => {
    WHACK-A-COBBIE — creatures pop from holes; bonk them. Earns
    coins + XP for the chosen buddy. Difficulty ramps over 30s.
    ============================================================ */
-function startWhack() {
+let whackIdx = -1;
+function startWhackWith(idx) {
+  whackIdx = idx;
+  const r = state.roster[idx];
+  $('rosterScreen').classList.remove('show');
   $('hubScreen').classList.remove('show');
   $('whack').style.display = 'block';
   enterMinigame();
-  whack.start();
+  whack.start({ key: r.key, stage: r.stage, hat: r.hat });
 }
 function endWhack(score) {
   const coins = score * 3;
   const xp = score * 4;
   state.coins += coins;
-  const buddy = state.roster.find((r) => r.key === state.buddy) || state.roster[0];
-  const before = buddy.stage;
-  buddy.xp += xp;
-  const after = stageFor(buddy.xp);
+  const r = state.roster[whackIdx] || state.roster[0];
+  const before = r.stage;
+  r.xp += xp;
+  const after = stageFor(r.xp);
   const evolved = after > before;
-  if (evolved) buddy.stage = after;
+  if (evolved) r.stage = after;
   addProgress(state, 'coins', coins);
   addProgress(state, 'games', 1);
+  state.stats.games++; state.stats.whackHits += score; // goal progress
   farm.sync();
   persist();
   syncCoins();
 
-  const cd = CRITTERS[buddy.key];
+  const cd = CRITTERS[r.key];
   $('resTitle').textContent = "TIME'S UP!";
-  $('resName').textContent = `${displayName(buddy)} · ${cd.stageNames[buddy.stage]}`;
+  $('resName').textContent = `${displayName(r)} · ${cd.stageNames[r.stage]}`;
   $('resStat').innerHTML = `<b>${score}</b> bonks`;
   $('resXP').textContent = '+' + xp + ' XP';
   $('resCoins').textContent = '+' + coins + ' 🪙';
   const rc = $('resCanvas').getContext('2d');
   rc.clearRect(0, 0, 96, 96);
-  drawCentered(rc, cd.stages[buddy.stage], PALS[cd.type], 96, 6);
+  drawCritterCentered(rc, r.key, r.stage, r.hat, 96, 6);
   setTimeout(() => $('results').classList.add('show'), 300);
-  pendingEvolve = evolved ? { key: buddy.key, before, after } : null;
+  pendingEvolve = evolved ? { key: r.key, before, after } : null;
 }
 
 /* ============================================================
@@ -624,6 +660,7 @@ function revealHatch(result) {
   }
   if (!result.isDupe) {
     addProgress(state, 'hatch', 1);
+    state.stats.hatches++; // goals
     if (state.homeCritters.length < 10) state.homeCritters.push(result.key); // show new friend at home
     persist(); renderChallenges();
   }
@@ -663,10 +700,10 @@ $('sceneBack').addEventListener('click', () => $('sceneScreen').classList.remove
 function pickScene(key) {
   state.settings.biome = key;
   persist();
-  renderScenes($('sceneGrid'), state.settings.biome, pickScene); // refresh highlight
+  renderScenes($('sceneGrid'), state.settings.biome, state.unlockedBiomes, pickScene);
 }
 function openScenes() {
-  renderScenes($('sceneGrid'), state.settings.biome, pickScene);
+  renderScenes($('sceneGrid'), state.settings.biome, state.unlockedBiomes, pickScene);
   $('sceneScreen').classList.add('show');
 }
 
@@ -700,7 +737,11 @@ function updateCardHome() {
 }
 
 /* ---------- critter hats ---------- */
-$('cardHat').addEventListener('click', () => { if (cardKey) openHatPicker(cardKey); });
+$('cardHat').addEventListener('click', () => {
+  if (!cardKey) return;
+  $('card').classList.remove('show'); // card sits above the hat screen — close it first
+  openHatPicker(cardKey);
+});
 $('hatBack').addEventListener('click', () => $('hatScreen').classList.remove('show'));
 function openHatPicker(key) {
   const owned = state.roster.find((r) => r.key === key);
@@ -714,10 +755,14 @@ function openHatPicker(key) {
   none.addEventListener('click', () => setHat(key, null));
   grid.appendChild(none);
   for (const h of HAT_LIST) {
+    const have = state.ownedHats.includes(h.id) || owned.hat === h.id;
     const cell = document.createElement('div');
-    cell.className = 'hatcell' + (owned.hat === h.id ? ' on' : '');
-    cell.innerHTML = `<span class="hatemoji">${h.emoji}</span><span class="hatname">${h.name}</span>`;
-    cell.addEventListener('click', () => setHat(key, h.id));
+    cell.className = 'hatcell' + (owned.hat === h.id ? ' on' : '') + (have ? '' : ' busy');
+    cell.innerHTML = `<span class="hatemoji">${have ? h.emoji : '🔒'}</span><span class="hatname">${h.name}</span>`;
+    cell.addEventListener('click', () => {
+      if (!have) { toast('Buy ' + h.name + ' in the Shop!'); return; }
+      setHat(key, h.id);
+    });
     grid.appendChild(cell);
   }
   $('hatScreen').classList.add('show');
@@ -741,9 +786,23 @@ function renderShop() {
     `${cost} 🪙`, state.coins >= cost, () => {
       if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); renderShop(); }
     }));
-  body.appendChild(shopItemSoon('🎩', 'Critter Cosmetics', 'Hats & accessories for your critters'));
-  body.appendChild(shopItemSoon('🖼️', 'More Backgrounds', 'New home scenes to unlock'));
-  body.appendChild(shopItemSoon('👕', 'Avatar Items', 'More looks in the Wardrobe'));
+
+  const head = document.createElement('div');
+  head.className = 'goals-head'; head.textContent = '🎩 HATS';
+  head.style.marginTop = '8px'; body.appendChild(head);
+  for (const h of HAT_LIST) {
+    const owned = state.ownedHats.includes(h.id);
+    const item = shopItem(h.emoji, h.name,
+      owned ? 'Equip it from a critter card' : 'A dapper little accessory',
+      owned ? 'OWNED' : `${h.cost} 🪙`, !owned && state.coins >= h.cost, () => {
+        if (owned || state.coins < h.cost) return;
+        state.coins -= h.cost; state.ownedHats.push(h.id);
+        persist(); syncCoins(); beep(() => sfx.coin()); toast('Bought ' + h.name + '!'); renderShop();
+      });
+    if (owned) item.querySelector('.shop-buy').classList.add('owned');
+    body.appendChild(item);
+  }
+  body.appendChild(shopItemSoon('🖼️', 'More Backgrounds', 'Unlock scenes via Challenges'));
 }
 function shopItem(emoji, title, desc, price, enabled, onBuy) {
   const el = document.createElement('div');
@@ -807,7 +866,36 @@ function renderChallenges() {
   const claim = $('chalClaim');
   claim.textContent = d.claimed ? 'CLAIMED ✓' : `CLAIM +${d.reward} 🪙`;
   claim.disabled = !d.done || d.claimed;
-  $('challengesbtn').classList.toggle('ready', d.done && !d.claimed);
+
+  // goals ladder
+  const gl = $('goalsList');
+  if (gl) {
+    gl.innerHTML = '';
+    for (const g of GOALS) {
+      const val = goalProgress(state, g);
+      const done = goalDone(state, g);
+      const claimed = goalClaimed(state, g);
+      const row = document.createElement('div');
+      row.className = 'goal-row' + (claimed ? ' claimed' : done ? ' done' : '');
+      row.innerHTML = `
+        <div class="goal-top"><span class="goal-text">${g.text}</span><span class="goal-reward">${rewardText(g.reward)}</span></div>
+        <div class="goal-bar"><div class="goal-fill" style="width:${Math.round((val / g.target) * 100)}%"></div></div>
+        <div class="goal-prog">${Math.min(val, g.target)} / ${g.target}</div>
+        ${done && !claimed ? '<button class="goal-claim">CLAIM REWARD</button>'
+          : claimed ? '<div class="goal-reward" style="text-align:center;margin-top:6px">Claimed ✓</div>' : ''}`;
+      gl.appendChild(row);
+      const btn = row.querySelector('.goal-claim');
+      if (btn) btn.addEventListener('click', () => claimGoalUI(g));
+    }
+  }
+  $('challengesbtn').classList.toggle('ready', (d.done && !d.claimed) || anyGoalClaimable(state));
+}
+function claimGoalUI(g) {
+  const reward = claimGoal(state, g);
+  if (!reward) return;
+  persist(); syncCoins(); beep(() => sfx.coin());
+  toast('Unlocked ' + rewardText(reward) + '!');
+  renderChallenges();
 }
 
 /* ---------- go ---------- */

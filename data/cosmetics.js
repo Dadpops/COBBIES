@@ -9,7 +9,7 @@
 
 export const HATS = {
   tophat: {
-    name: 'TOP HAT', emoji: '🎩',
+    name: 'TOP HAT', emoji: '🎩', cost: 140,
     pal: [null, '#111015', '#2b2b33', '#c04a4a'],
     grid: [
       [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
@@ -20,7 +20,7 @@ export const HATS = {
     ],
   },
   cap: {
-    name: 'BALL CAP', emoji: '🧢',
+    name: 'BALL CAP', emoji: '🧢', cost: 60,
     pal: [null, '#16283a', '#3a7ad0', '#eaf2ff'],
     grid: [
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
@@ -31,7 +31,7 @@ export const HATS = {
     ],
   },
   party: {
-    name: 'PARTY HAT', emoji: '🥳',
+    name: 'PARTY HAT', emoji: '🥳', cost: 90,
     pal: [null, '#3a1a4a', '#e85aa0', '#ffd24a'],
     grid: [
       [0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0],
@@ -42,7 +42,7 @@ export const HATS = {
     ],
   },
   crown: {
-    name: 'CROWN', emoji: '👑',
+    name: 'CROWN', emoji: '👑', cost: 250,
     pal: [null, '#8a6a10', '#ffd24a', '#ff6a6a'],
     grid: [
       [0,0,0,0,2,0,2,0,2,0,2,0,0,0,0,0],
@@ -51,7 +51,7 @@ export const HATS = {
     ],
   },
   flower: {
-    name: 'FLOWER', emoji: '🌸',
+    name: 'FLOWER', emoji: '🌸', cost: 60,
     pal: [null, '#3a6a3a', '#ff8ab8', '#ffe04a'],
     grid: [
       [0,0,0,2,0,2,0,0,0,0,0,0,0,0,0,0],
@@ -60,7 +60,7 @@ export const HATS = {
     ],
   },
   bow: {
-    name: 'BOW', emoji: '🎀',
+    name: 'BOW', emoji: '🎀', cost: 80,
     pal: [null, '#8a2a4a', '#e85a8a', '#ffffff'],
     grid: [
       [0,0,0,0,2,2,0,2,2,0,0,0,0,0,0,0],
@@ -69,7 +69,7 @@ export const HATS = {
     ],
   },
   straw: {
-    name: 'STRAW HAT', emoji: '👒',
+    name: 'STRAW HAT', emoji: '👒', cost: 110,
     pal: [null, '#8a6a2a', '#e8c86a', '#c04a4a'],
     grid: [
       [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],

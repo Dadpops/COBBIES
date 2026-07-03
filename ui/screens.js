@@ -253,20 +253,23 @@ export function renderAvatarEditor(container, sel, onChange) {
  * @param {string} current   currently selected biome key
  * @param {(key:string)=>void} onPick
  */
-export function renderScenes(container, current, onPick) {
+export function renderScenes(container, current, unlocked, onPick) {
   container.innerHTML = '';
+  const un = new Set(unlocked || Object.keys(BIOMES));
   for (const key of Object.keys(BIOMES)) {
     const b = BIOMES[key];
+    const locked = !un.has(key);
     const cell = document.createElement('div');
-    cell.className = 'scell' + (key === current ? ' active' : '');
+    cell.className = 'scell' + (key === current ? ' active' : '') + (locked ? ' locked-scene' : '');
     cell.innerHTML = `
       <div class="sswatch" style="background:linear-gradient(180deg,${b.sky[0]},${b.horizon} 62%,${b.ground})">
         <span class="stile" style="background:${b.tileA.top}"></span>
         <span class="stile" style="background:${b.tileB.top}"></span>
       </div>
-      <div class="sname">${b.emoji} ${b.name}</div>`;
+      <div class="sname">${b.emoji} ${b.name}</div>
+      ${locked ? '<div class="lock">🔒</div>' : ''}`;
     container.appendChild(cell);
-    cell.addEventListener('click', () => onPick(key));
+    if (!locked) cell.addEventListener('click', () => onPick(key));
   }
 }
 

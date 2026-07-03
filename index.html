@@ -47,15 +47,19 @@
   </div>
 
   <!-- CHALLENGES -->
-  <div class="screen center" id="challengesScreen">
+  <div class="screen" id="challengesScreen">
     <button class="backbtn" id="challengesBack">‹</button>
     <h2>CHALLENGES</h2>
-    <div class="chal-card">
-      <div class="chal-daily">⭐ DAILY CHALLENGE</div>
-      <div class="chal-text" id="chalText">—</div>
-      <div class="chal-bar"><div class="chal-fill" id="chalFill"></div></div>
-      <div class="chal-prog" id="chalProg">—</div>
-      <button class="btn" id="chalClaim">CLAIM</button>
+    <div class="chal-scroll">
+      <div class="goals-head">⭐ DAILY · EARN COINS</div>
+      <div class="chal-card">
+        <div class="chal-text" id="chalText">—</div>
+        <div class="chal-bar"><div class="chal-fill" id="chalFill"></div></div>
+        <div class="chal-prog" id="chalProg">—</div>
+        <button class="btn" id="chalClaim">CLAIM</button>
+      </div>
+      <div class="goals-head">🏆 LIFETIME · UNLOCKS</div>
+      <div id="goalsList"></div>
     </div>
   </div>
 
@@ -78,8 +82,9 @@
   <!-- JOBS / IDLE STATIONS -->
   <div class="screen" id="jobsScreen">
     <button class="backbtn" id="jobsBack">‹</button>
-    <h2>RANCH JOBS</h2>
+    <h2>THE BARN</h2>
     <div class="sub">STATION CRITTERS TO EARN COINS OVER TIME</div>
+    <canvas id="barnScene" class="barn-scene" width="380" height="120"></canvas>
     <div id="jobsList"></div>
   </div>
 

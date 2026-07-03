@@ -8,6 +8,7 @@
 
 import { CRITTERS, PALS } from '../data/creatures.js';
 import { drawPix } from '../render/pixel.js';
+import { drawCritter } from '../render/critter.js';
 
 const DURATION = 30;
 
@@ -15,6 +16,7 @@ export function createWhack(canvas, opts) {
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, raf = 0, last = 0;
   let holes = [], elapsed = 0, score = 0, running = false, spawnT = 0;
+  let player = null, cursor = { x: 0, y: 0 }, swing = 0;
 
   function resize() {
     const r = canvas.getBoundingClientRect();
@@ -67,11 +69,26 @@ export function createWhack(canvas, opts) {
         else if (h.dir === 0 && h.active) { h.tUp -= dt; if (h.tUp <= 0) h.dir = -1; }
         else if (h.dir === -1) { h.up = Math.max(0, h.up - dt * 6); if (h.up <= 0) { h.dir = 0; h.active = false; } }
       }
+      if (swing > 0) swing = Math.max(0, swing - dt * 6);
       opts.onIntensity && opts.onIntensity(d.prog);
       if (elapsed >= DURATION) { end(); }
     }
     draw();
     raf = running ? requestAnimationFrame(loop) : 0;
+  }
+
+  /** The chosen character stands to the right of the cursor with a mallet. */
+  function drawPlayer() {
+    if (!player) return;
+    const cx = cursor.x, cy = cursor.y;
+    const hx = cx - 6, hy = (cy - 24) + 22 * swing; // mallet head: raised, slams to cursor on tap
+    ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx + 5, hy + 6); ctx.lineTo(cx + 14, cy - 4); ctx.stroke();
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(hx - 8, hy, 18, 10);
+    ctx.fillStyle = '#787e86'; ctx.fillRect(hx - 8, hy, 18, 3);
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    ctx.beginPath(); ctx.ellipse(cx + 20, cy + 14, 14, 5, 0, 0, 6.28); ctx.fill();
+    drawCritter(ctx, player.key, player.stage, player.hat, cx + 2, cy - 30, 3);
   }
 
   function drawBomb(x, y, up, pop) {
@@ -127,6 +144,8 @@ export function createWhack(canvas, opts) {
     ctx.textAlign = 'left'; ctx.fillText('★ ' + score, 26, 30);
     ctx.textAlign = 'right';
     ctx.fillText(Math.max(0, Math.ceil(DURATION - elapsed)) + 's', W - 26, 30);
+
+    drawPlayer();
   }
 
   function roundRect(x, y, w, h, r) {
@@ -136,11 +155,18 @@ export function createWhack(canvas, opts) {
     ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
+  function onMove(e) {
+    const r = canvas.getBoundingClientRect();
+    cursor.x = (e.clientX - r.left) * (W / r.width);
+    cursor.y = (e.clientY - r.top) * (H / r.height);
+  }
+
   function onDown(e) {
     if (!running) return;
     const r = canvas.getBoundingClientRect();
     const mx = (e.clientX - r.left) * (W / r.width);
     const my = (e.clientY - r.top) * (H / r.height);
+    cursor.x = mx; cursor.y = my; swing = 1; // slam the mallet where you tapped
     for (const h of holes) {
       if (h.active && h.up > 0.35 && h.dir >= 0) {
         const cy = h.y - 20 * h.up;
@@ -155,10 +181,13 @@ export function createWhack(canvas, opts) {
     }
   }
 
-  function start() {
+  function start(p) {
+    player = p || null;
     resize(); layout();
-    elapsed = 0; score = 0; spawnT = 0.6; running = true; last = performance.now();
+    cursor = { x: W * 0.5, y: H * 0.6 };
+    elapsed = 0; score = 0; spawnT = 0.6; running = true; swing = 0; last = performance.now();
     canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
     if (!raf) loop();
   }
   function end() {
@@ -169,6 +198,7 @@ export function createWhack(canvas, opts) {
   function stop() {
     running = false; cancelAnimationFrame(raf); raf = 0;
     canvas.removeEventListener('pointerdown', onDown);
+    canvas.removeEventListener('pointermove', onMove);
   }
 
   return { start, stop, resize };

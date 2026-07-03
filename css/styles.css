@@ -385,3 +385,40 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 .hatcell.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,149,74,.4),2px 2px 0 rgba(0,0,0,.2)}
 .hatcell .hatemoji{font-size:26px}
 .hatcell .hatname{font-size:8px;letter-spacing:.06em;font-weight:700;text-align:center}
+
+/* ---- challenges + goals list ---- */
+#challengesScreen{padding:0}
+.chal-scroll{flex:1;overflow-y:auto;padding:54px 16px 24px;display:flex;flex-direction:column;
+  align-items:center;gap:12px}
+.goals-head{font-size:10px;letter-spacing:.14em;color:#9ab;font-weight:700;margin-top:6px}
+#goalsList{width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px}
+.goal-row{background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.goal-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.goal-text{font-size:10px;letter-spacing:.03em;font-weight:700}
+.goal-reward{font-size:9px;color:#8a7a5a;white-space:nowrap}
+.goal-bar{height:8px;background:#e0d4b8;border-radius:4px;overflow:hidden}
+.goal-fill{height:100%;background:#7ab8ff;border-radius:4px;transition:width .4s}
+.goal-claim{margin-top:8px;width:100%;font-family:inherit;font-size:10px;font-weight:700;color:#fff;
+  background:var(--accent);border:none;border-radius:8px;padding:9px;cursor:pointer}
+.goal-row.done{border-color:#3a8f4a;box-shadow:0 0 0 2px rgba(58,143,74,.25)}
+.goal-row.claimed{opacity:.55}
+
+/* ---- shop hats + soon items already styled; owned tag ---- */
+.shop-buy.owned{background:#3a8f4a}
+
+/* ---- scene lock ---- */
+.scell.locked-scene{opacity:.5;position:relative}
+.scell .lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:22px;background:rgba(0,0,0,.25);border-radius:13px}
+
+/* ---- barn & pen interior rooms ---- */
+#jobsScreen{background:linear-gradient(180deg,#4a3420,#2c1e12)}
+.barn-scene{position:static;width:calc(100% - 32px);max-width:360px;height:auto;
+  margin:0 auto 8px;border:3px solid #33240f;border-radius:12px;image-rendering:pixelated;
+  box-shadow:0 3px 0 rgba(0,0,0,.25)}
+#dexScreen{background:linear-gradient(180deg,#3f6a3a,#26401f)}
+#dexScreen h2, #jobsScreen h2{color:#fff}
+.hatcell.busy{opacity:.5}
+
+/* ---- goal numeric progress ---- */
+.goal-prog{font-size:9px;color:#8a7a5a;letter-spacing:.06em;margin-top:4px;text-align:right}

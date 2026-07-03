@@ -50,6 +50,10 @@ export function defaultState() {
     buddy: 'nora',
     daily: null,   // filled in by ensureDaily() on boot
     stations: { berry: { key: null, since: 0 }, pond: { key: null, since: 0 }, lookout: { key: null, since: 0 } },
+    stats: { games: 0, whackHits: 0, hatches: 0, runBest: 0 }, // lifetime counters for goals
+    ownedHats: [],            // hats bought in the shop
+    goalsClaimed: [],         // ids of completed+claimed goals
+    unlockedBiomes: ['meadow'], // scenes unlocked via goals
     settings: { musicOn: true, musicDynamic: true, volume: 0.7, track: 0, biome: 'meadow' },
   };
 }
@@ -99,6 +103,11 @@ function migrate(s) {
     ...s,
     avatar: { ...base.avatar, ...(s.avatar || {}) },
     stations: { ...base.stations, ...(s.stations || {}) },
+    stats: { ...base.stats, ...(s.stats || {}) },
+    ownedHats: Array.isArray(s.ownedHats) ? s.ownedHats : [],
+    goalsClaimed: Array.isArray(s.goalsClaimed) ? s.goalsClaimed : [],
+    // existing saves keep access to every scene; new games start with meadow only
+    unlockedBiomes: Array.isArray(s.unlockedBiomes) ? s.unlockedBiomes : ['meadow', 'desert', 'snow', 'dusk'],
     settings: { ...base.settings, ...(s.settings || {}) },
   };
   if (!Array.isArray(state.roster) || state.roster.length === 0) {
