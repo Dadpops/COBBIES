@@ -44,7 +44,7 @@ export function createRunner(canvas, onDistance, onEnd, onClear) {
     run = {
       key: creature.key, stage: creature.stage,
       x: RW * 0.35, y: groundY, vy: 0, groundY, onGround: true,
-      dist: 0, speed: 2.3, obstacles: [], spawnT: 240, alive: true, t: 0,
+      dist: 0, speed: 1.9, obstacles: [], spawnT: 240, alive: true, t: 0,
       bg1: 0, bg2: 0, strideT: 0, dust: [], coyote: 6, jumpBuffer: 0, clears: 0,
     };
     if (!raf) loop();
@@ -53,7 +53,7 @@ export function createRunner(canvas, onDistance, onEnd, onClear) {
   function loop() {
     if (!run) { raf = 0; return; }
     run.t += 0.016;
-    if (run.speed < 6.6) run.speed += 0.0010; // steadily speeds up, then caps
+    if (run.speed < 5.0) run.speed += 0.0007; // steadily speeds up, then caps (calmer than before)
     run.dist += run.speed * 0.5;
 
     // coyote time: brief window to still jump just after leaving the ground

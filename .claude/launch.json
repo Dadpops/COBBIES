@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "cobbies",
-      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeExecutable": "node",
       "runtimeArgs": ["server.js"],
       "port": 8000
     }

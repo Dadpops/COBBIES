@@ -14,12 +14,15 @@ import * as Save from './systems/save.js';
 import { createFarm, AVATAR_KEY } from './systems/farm.js';
 import { createRunner } from './systems/run.js';
 import { createWhack } from './systems/whack.js';
+import { createCatch } from './systems/catch.js';
+import { createFishing } from './systems/fishing.js';
+import { createRhythm } from './systems/rhythm.js';
 import { createMusic, TRACKS } from './audio/music.js';
 import { createSfx } from './audio/sfx.js';
 import { HAT_LIST, HATS } from './data/cosmetics.js';
 import { drawCritter, drawCritterCentered } from './render/critter.js';
 import { GOALS, goalProgress, goalDone, goalClaimed, rewardText, claimGoal, anyGoalClaimable } from './systems/quests.js';
-import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
+import { ensureDaily, getDailies, addProgress, claim as claimDaily, anyDailyClaimable } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
 } from './systems/hatch.js';
@@ -27,10 +30,15 @@ import {
   STATIONS, totalAccrued, collectAll, collectOne, assign as assignStation,
   unassign as unassignStation, stationOf, expand as expandRanch, expandCost, isFull,
 } from './systems/idle.js';
+import { applyRanchLevel, ranchTier, nextRanchTier, ranchLevelFor } from './systems/ranch.js';
+import { HAMMERS, HAMMER_LIST, drawHammer } from './data/hammers.js';
 import {
   renderRoster, renderCollection, renderCard, renderScenes, displayName,
   renderAvatarEditor, drawAvatarPreview, renderStations, renderPicker,
 } from './ui/screens.js';
+import { initTitle } from './ui/title.js';
+import { initTutorial } from './ui/tutorial.js';
+import { initSettings } from './ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -58,10 +66,32 @@ const sfx = createSfx();
 const beep = (fn) => { if (state.settings.musicOn) fn(); };
 const whack = createWhack($('whack'), {
   getState: () => state,
-  onScore: (x, y) => { beep(() => sfx.smack()); beep(() => sfx.coin()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'whackHits', 1); },
+  onScore: (x, y) => { beep(() => sfx.squeak()); beep(() => sfx.coin()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'whackHits', 1); },
   onBomb: (x, y) => { beep(() => sfx.bomb()); floatPop(x, y, '✗', 'x'); },
   onIntensity: (p) => music.setIntensity(Math.min(0.7, p * 0.55)), // gentle
   onEnd: (score) => endWhack(score),
+});
+const gameIntensity = (p) => music.setIntensity(Math.min(0.7, p * 0.55));
+const catchGame = createCatch($('catch'), {
+  getState: () => state,
+  onScore: (x, y) => { beep(() => sfx.coin()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'catchHits', 1); },
+  onMiss: (x, y) => { beep(() => sfx.bomb()); if (x != null) floatPop(x, y, '✗', 'x'); },
+  onIntensity: gameIntensity,
+  onEnd: (score) => endCatch(score),
+});
+const fishGame = createFishing($('fishing'), {
+  getState: () => state,
+  onScore: (x, y) => { beep(() => sfx.coin()); floatPop(x, y, '🐟', 'coin'); addProgress(state, 'fishHits', 1); },
+  onMiss: () => beep(() => sfx.error()),
+  onIntensity: gameIntensity,
+  onEnd: (score) => endFishing(score),
+});
+const rhythmGame = createRhythm($('rhythm'), {
+  getState: () => state,
+  onScore: (x, y) => { beep(() => sfx.coin()); floatPop(x, y, '♪', 'coin'); addProgress(state, 'rhythmHits', 1); },
+  onMiss: () => beep(() => sfx.error()),
+  onIntensity: gameIntensity,
+  onEnd: (score) => endRhythm(score),
 });
 
 /* Floating popup (coin ding / bomb X) at a page position. */
@@ -75,7 +105,8 @@ function floatPop(px, py, text, cls) {
 }
 window.addEventListener('resize', () => {
   farm.resize(); runner.resize(); whack.resize();
-  if ($('tutorialScreen').classList.contains('show')) renderTut();
+  catchGame.resize(); fishGame.resize(); rhythmGame.resize();
+  if ($('tutorialScreen').classList.contains('show')) tutorial.render();
 });
 
 /* ============================================================
@@ -129,13 +160,14 @@ function syncCoins() {
 function boot() {
   farm.start();
   ensureDaily(state);
+  applyRanchLevel(state); // reconcile ranch level with the collection (grants any owed bonus)
   // idle earnings collected while away
   const away = totalAccrued(state, Date.now());
   if (away > 0) { collectAll(state, Date.now()); toast(`🧺 Your ranch earned ${away} 🪙 while you were away!`); }
   persist();
   renderChallenges();
   syncCoins();
-  showTitle();
+  title.show();
 }
 function proceedFromTitle() {
   if (!state.playerName) {
@@ -144,69 +176,13 @@ function proceedFromTitle() {
     $('nameScreen').classList.add('show');
     $('nameInput').focus();
   } else if (!state.tutorialSeen) {
-    openTutorial();
+    tutorial.open();
   } else {
     scheduleDialogue();
   }
 }
 
-/* ============================================================
-   TITLE / SPLASH — the real in-game Nora + a pixel COBBIES
-   wordmark. Eyes are enlarged here for legibility at a glance.
-   ============================================================ */
-const TITLE_FONT = {
-  C: ['01110', '10001', '10000', '10000', '10000', '10001', '01110'],
-  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
-  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
-  I: ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
-  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
-  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
-};
-function drawTitleWord(cv) {
-  const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height, text = 'COBBIES';
-  ctx.clearRect(0, 0, W, H);
-  const px = Math.floor(W / (text.length * 6 + 1));
-  const wordW = text.length * 6 * px - px;
-  const x0 = (W - wordW) / 2, y0 = (H - 7 * px) / 2;
-  const sh = Math.max(2, Math.round(px * 0.28));
-  for (let i = 0; i < text.length; i++) {
-    const g = TITLE_FONT[text[i]], lx = x0 + i * 6 * px;
-    for (let r = 0; r < 7; r++) for (let c = 0; c < 5; c++) if (g[r][c] === '1') {
-      ctx.fillStyle = '#6a2f0a'; ctx.fillRect(lx + c * px, y0 + r * px + sh, px, px);       // drop shadow
-      ctx.fillStyle = '#f0a24a'; ctx.fillRect(lx + c * px, y0 + r * px, px, px);             // face
-      ctx.fillStyle = '#ffd24a'; ctx.fillRect(lx + c * px, y0 + r * px, px, Math.ceil(px / 3)); // top hilite
-    }
-  }
-}
-function drawTitleNora(cv, t) {
-  const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height;
-  ctx.clearRect(0, 0, W, H);
-  const cell = Math.floor(Math.min(W, H) / 18);
-  const bob = Math.abs(Math.sin(t)) * 4;
-  const ox = (W - 16 * cell) / 2, oy = (H - 16 * cell) / 2 - bob;
-  // soft shadow
-  ctx.fillStyle = 'rgba(0,0,0,.14)';
-  ctx.beginPath(); ctx.ellipse(W / 2, oy + 15 * cell, 8 * cell, 2 * cell, 0, 0, 6.28); ctx.fill();
-  // the real in-game Nora sprite, unmodified
-  drawPix(ctx, CRITTERS.nora.stages[2], PALS.nora, ox, oy, cell);
-}
-let titleRaf = 0, titleT = 0;
-function showTitle() {
-  drawTitleWord($('titleWord'));
-  $('titleScreen').classList.add('show');
-  titleT = 0;
-  const loop = () => { titleT += 0.05; drawTitleNora($('titleNora'), titleT); titleRaf = requestAnimationFrame(loop); };
-  loop();
-}
-function hideTitle() {
-  if (!$('titleScreen').classList.contains('show')) return;
-  cancelAnimationFrame(titleRaf); titleRaf = 0;
-  $('titleScreen').classList.remove('show');
-  proceedFromTitle();
-}
-$('titleScreen').addEventListener('click', hideTitle);
+/* The title/splash screen lives in ./ui/title.js — wired near boot(). */
 
 $('nameGo').addEventListener('click', submitName);
 $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitName(); });
@@ -215,106 +191,10 @@ function submitName() {
   state.playerName = v || 'FRIEND';
   persist();
   $('nameScreen').classList.remove('show');
-  openTutorial();
+  tutorial.open();
 }
 
-/* ============================================================
-   HOW TO PLAY — a first-launch walkthrough of the core loop and
-   every ranch feature. Reopenable anytime via the ❓ topbar button.
-   ============================================================ */
-// Each step highlights a real element (`target`) while explaining it. Targets:
-// 'critters' = the roaming band, 'play' = the PLAY button, a building id
-// (nest/barn/pen/shop), 'topright' = the topbar tools, or null for a centered card.
-const TUTORIAL = [
-  { emoji: '👋', title: 'WELCOME!', target: null, body: () =>
-    `Hi ${state.playerName || 'friend'}! <b>Cobbies</b> are cute pixel critters you collect, raise, and play with. Here's a quick guided tour of your ranch.` },
-  { emoji: '🐾', title: 'YOUR COBBIES', target: 'critters', body: () =>
-    `These little friends roam your ranch and greet you by name. <b>Tap any cobbie</b> to open its card — every game they play earns XP and <b>evolves</b> them into new forms.` },
-  { emoji: '▶️', title: 'PLAY & EARN', target: 'play', body: () =>
-    `Tap <b>PLAY</b> for minigames — one-tap <b>Runner</b> and <b>Whack-a-Cobbie</b>. Pick a star cobbie plus a <b>cheerleader buddy</b>, then rack up <b>XP + coins</b>.` },
-  { emoji: '🥚', title: 'THE HATCHERY', target: 'nest', body: () =>
-    `This is the <b>Nest</b>. Spend coins on a <b>random egg</b> (always someone new — with pity for legendaries) or pick an exact critter. Duplicates bank bonus XP.` },
-  { emoji: '🚜', title: 'THE BARN', target: 'barn', body: () =>
-    `Send cobbies to <b>work</b> at the Barn — the Berry Patch, Fishing Hole and Lookout earn coins over time, even while you're away. Collect coins to <b>expand your ranch</b>.` },
-  { emoji: '📖', title: 'THE PEN', target: 'pen', body: () =>
-    `Your full <b>collection</b> lives in the Pen. Browse everyone you've found, spot the locked silhouettes still to discover, and choose which cobbies roam your home ranch.` },
-  { emoji: '🎩', title: 'SHOP & WARDROBE', target: 'shop', body: () =>
-    `Spend coins in the <b>Shop</b> on dapper <b>hats</b> and ranch expansions — then equip hats from any critter's card and style your own avatar at the <b>Wardrobe</b>.` },
-  { emoji: '⭐', title: 'DAILY CHALLENGES', target: 'topright', body: () =>
-    `Up here live the <b>⭐ daily challenge</b> and long-term goals (coins + unlocks), the <b>🗺️ scene</b> picker for new backgrounds, and <b>⚙️ settings</b> for music.` },
-  { emoji: '🚀', title: "YOU'RE READY!", target: null, body: () =>
-    `That's the whole ranch! Collect them all and make it cozy. Tap the <b>❓</b> up top anytime to replay this tour. Have fun, ${state.playerName || 'friend'}!` },
-];
-let tutIdx = 0;
-function openTutorial() {
-  tutIdx = 0;
-  const dots = $('tutDots');
-  dots.innerHTML = '';
-  TUTORIAL.forEach(() => dots.appendChild(document.createElement('i')));
-  $('tutorialScreen').classList.add('show');
-  renderTut();
-}
-/** Page-space rect of a step's highlight target (null = centered, no spotlight). */
-function tutTargetRect(target) {
-  if (!target) return null;
-  if (target === 'play') return $('playBig').getBoundingClientRect();
-  if (target === 'topright') return document.querySelector('.top-right').getBoundingClientRect();
-  if (target === 'critters') {
-    const r = $('farm').getBoundingClientRect();
-    return { left: r.left + r.width * 0.15, top: r.top + r.height * 0.7, width: r.width * 0.7, height: r.height * 0.22 };
-  }
-  return farm.buildingRect(target); // nest / barn / pen / shop / wardrobe
-}
-function renderTut() {
-  const step = TUTORIAL[tutIdx];
-  $('tutEmoji').textContent = step.emoji;
-  $('tutTitle').textContent = step.title;
-  $('tutBody').innerHTML = step.body();
-  $('tutPrev').disabled = tutIdx === 0;
-  $('tutNext').textContent = tutIdx === TUTORIAL.length - 1 ? "LET'S PLAY ▸" : 'NEXT ›';
-  [...$('tutDots').children].forEach((d, i) => d.classList.toggle('on', i === tutIdx));
-  positionSpotlight(tutTargetRect(step.target));
-}
-// Frame the highlighted rect with four dark panels + an accent ring, and park
-// the caption card on the opposite side so it never covers the highlight.
-function positionSpotlight(rect) {
-  const spot = $('tutSpot'), card = $('tutCard');
-  const app = $('app').getBoundingClientRect();
-  const W = app.width, H = app.height;
-  const setBox = (el, l, t, w, h) => {
-    el.style.left = l + 'px'; el.style.top = t + 'px';
-    el.style.width = Math.max(0, w) + 'px'; el.style.height = Math.max(0, h) + 'px';
-  };
-  if (!rect) {
-    // no target — dim the whole screen (one panel covers all), center the card
-    setBox($('tutMaskT'), 0, 0, W, H);
-    [$('tutMaskB'), $('tutMaskL'), $('tutMaskR')].forEach((m) => setBox(m, 0, 0, 0, 0));
-    spot.classList.add('none'); setBox(spot, W / 2, H * 0.42, 0, 0);
-    card.classList.add('center'); card.style.top = ''; card.style.bottom = '';
-    return;
-  }
-  spot.classList.remove('none'); card.classList.remove('center');
-  const l = rect.left - app.left, t = rect.top - app.top, w = rect.width, h = rect.height;
-  setBox($('tutMaskT'), 0, 0, W, t);
-  setBox($('tutMaskB'), 0, t + h, W, H - (t + h));
-  setBox($('tutMaskL'), 0, t, l, h);
-  setBox($('tutMaskR'), l + w, t, W - (l + w), h);
-  setBox(spot, l, t, w, h);
-  // caption goes opposite the target so it never covers the highlight
-  if (t + h / 2 < H * 0.5) { card.style.top = ''; card.style.bottom = '22px'; }
-  else { card.style.bottom = ''; card.style.top = '18px'; }
-}
-function closeTutorial() {
-  $('tutorialScreen').classList.remove('show');
-  if (!state.tutorialSeen) { state.tutorialSeen = true; persist(); }
-  scheduleDialogue();
-}
-$('tutPrev').addEventListener('click', () => { if (tutIdx > 0) { tutIdx--; renderTut(); } });
-$('tutNext').addEventListener('click', () => {
-  if (tutIdx < TUTORIAL.length - 1) { tutIdx++; renderTut(); } else closeTutorial();
-});
-$('tutSkip').addEventListener('click', closeTutorial);
-$('helpbtn').addEventListener('click', openTutorial);
+/* The how-to-play walkthrough lives in ./ui/tutorial.js — wired near boot(). */
 
 /* ============================================================
    HOME DIALOGUE (Phase 2 seed) — a random owned critter greets
@@ -350,13 +230,17 @@ function showDialogue() {
 $('hubBack').addEventListener('click', () => $('hubScreen').classList.remove('show'));
 function openHub() {
   updateHubBuddyName();
+  updateHubHammerName();
   updateMusicToggle();
   $('hubScreen').classList.add('show');
 }
 $('hubRun').addEventListener('click', () => openRosterFor(startRun));
 $('hubWhack').addEventListener('click', () => openRosterFor(startWhackWith));
+$('hubCatch').addEventListener('click', () => openRosterFor(startCatchWith));
+$('hubFish').addEventListener('click', () => openRosterFor(startFishWith));
+$('hubRhythm').addEventListener('click', () => openRosterFor(startRhythmWith));
 function openRosterFor(onPick) {
-  renderRoster($('roster'), state.roster, onPick);
+  renderRoster($('roster'), state.roster, onPick, state.buddy);
   $('rosterScreen').classList.add('show');
 }
 $('rosterBack').addEventListener('click', () => $('rosterScreen').classList.remove('show'));
@@ -385,70 +269,40 @@ function openBuddySelect() {
   $('buddyScreen').classList.add('show');
 }
 
-/* ---------- sound options (opens Settings) ---------- */
-$('musicToggle').addEventListener('click', openSettings);
-function updateMusicToggle() { $('musicToggle').textContent = '🎵 SOUND OPTIONS'; }
+/* ---------- hammer skin selection (Whack-a-Cobbie mallet) ---------- */
+$('hubHammer').addEventListener('click', openHammerSelect);
+$('hammerBack').addEventListener('click', () => $('hammerScreen').classList.remove('show'));
+function updateHubHammerName() {
+  $('hubHammerName').textContent = HAMMERS[state.hammer]?.name || 'WOODEN';
+}
+/** The goal whose reward is this hammer, for the "how to unlock" hint. */
+function hammerGoalHint(id) {
+  const g = GOALS.find((x) => x.reward.type === 'hammer' && x.reward.id === id);
+  return g ? g.text : 'Locked';
+}
+function openHammerSelect() {
+  const grid = $('hammerGrid');
+  grid.innerHTML = '';
+  for (const h of HAMMER_LIST) {
+    const owned = state.ownedHammers.includes(h.id);
+    const on = state.hammer === h.id;
+    const cell = document.createElement('div');
+    cell.className = 'hatcell' + (on ? ' on' : '') + (owned ? '' : ' busy');
+    cell.innerHTML = `<canvas width="56" height="56"></canvas>`
+      + `<div class="hatname">${owned ? h.name : '🔒 ' + h.name}</div>`
+      + (owned ? '' : `<div class="hatgoal">${hammerGoalHint(h.id)}</div>`);
+    grid.appendChild(cell);
+    drawHammer(cell.querySelector('canvas').getContext('2d'), h, 28, 42, 1.4, 0);
+    cell.addEventListener('click', () => {
+      if (!owned) { toast('Unlock it — ' + hammerGoalHint(h.id)); return; }
+      state.hammer = h.id; persist(); updateHubHammerName(); openHammerSelect();
+    });
+  }
+  $('hammerScreen').classList.add('show');
+}
 
-/* ============================================================
-   SETTINGS — music track / volume / dynamic-tempo / on-off.
-   ============================================================ */
-$('settingsbtn').addEventListener('click', openSettings);
-$('settingsBack').addEventListener('click', () => $('settingsScreen').classList.remove('show'));
-function openSettings() { renderSettings(); $('settingsScreen').classList.add('show'); }
-function renderSettings() {
-  const b = $('settingsBody');
-  b.innerHTML = '';
-  b.appendChild(toggleRow('MUSIC', state.settings.musicOn, () => {
-    state.settings.musicOn = !state.settings.musicOn; persist();
-    if (state.settings.musicOn) { musicStarted = false; startMusicOnce(); }
-    else { music.stop(); musicStarted = false; }
-    renderSettings();
-  }));
-  b.appendChild(chipRow('TRACK', TRACKS.map((t) => t.name), state.settings.track, (i) => {
-    state.settings.track = i; persist(); music.setTrack(i);
-    if (state.settings.musicOn) startMusicOnce();
-    renderSettings();
-  }));
-  const vr = document.createElement('div'); vr.className = 'set-row';
-  vr.innerHTML = '<span class="set-label">VOLUME</span>';
-  const slider = document.createElement('input');
-  slider.type = 'range'; slider.min = '0'; slider.max = '100'; slider.className = 'set-vol';
-  slider.value = Math.round(state.settings.volume * 100);
-  slider.addEventListener('input', () => { state.settings.volume = slider.value / 100; music.setVolume(state.settings.volume); });
-  slider.addEventListener('change', persist);
-  vr.appendChild(slider); b.appendChild(vr);
-  b.appendChild(toggleRow('SPEED-UP IN GAMES', state.settings.musicDynamic, () => {
-    state.settings.musicDynamic = !state.settings.musicDynamic; persist();
-    music.setDynamic(state.settings.musicDynamic); renderSettings();
-  }));
-}
-function toggleRow(label, on, onClick) {
-  const row = document.createElement('div'); row.className = 'set-row';
-  row.innerHTML = `<span class="set-label">${label}</span>`;
-  const opts = document.createElement('div'); opts.className = 'set-opts';
-  ['ON', 'OFF'].forEach((t, i) => {
-    const active = (i === 0) === on;
-    const btn = document.createElement('button');
-    btn.className = 'av-chip' + (active ? ' on' : '');
-    btn.textContent = t;
-    btn.addEventListener('click', () => { if (!active) onClick(); });
-    opts.appendChild(btn);
-  });
-  row.appendChild(opts); return row;
-}
-function chipRow(label, names, sel, onPick) {
-  const row = document.createElement('div'); row.className = 'set-row';
-  row.innerHTML = `<span class="set-label">${label}</span>`;
-  const opts = document.createElement('div'); opts.className = 'set-opts';
-  names.forEach((n, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'av-chip' + (sel === i ? ' on' : '');
-    btn.textContent = n;
-    btn.addEventListener('click', () => onPick(i));
-    opts.appendChild(btn);
-  });
-  row.appendChild(opts); return row;
-}
+/* ---------- sound options label (the panel lives in ./ui/settings.js) ---------- */
+function updateMusicToggle() { $('musicToggle').textContent = '🎵 SOUND OPTIONS'; }
 
 /* ============================================================
    RANCH JOBS (idle) — station critters to earn coins over time,
@@ -468,7 +322,24 @@ function jobsHandlers() {
     onExpand: () => { if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); refreshJobs(); } },
   };
 }
-function refreshJobs() { renderStations($('jobsList'), state, Date.now(), jobsHandlers()); drawBarnScene(); }
+function refreshJobs() { renderStations($('jobsList'), state, Date.now(), jobsHandlers()); drawBarnScene(); updateRanchInfo(); }
+// Current ranch level + progress toward the next tier, shown in the Barn.
+function updateRanchInfo() {
+  const collected = state.roster.length;
+  const level = ranchLevelFor(collected);
+  const tier = ranchTier(level);
+  const next = nextRanchTier(collected);
+  const el = $('ranchInfo');
+  if (!el) return;
+  if (next) {
+    const pct = Math.round(((collected - tier.need) / (next.need - tier.need)) * 100);
+    el.innerHTML = `🏡 RANCH LEVEL <b>${level}</b> · ${tier.name}<br>`
+      + `Next — <b>${next.name}</b> at ${next.need} cobbies (${collected}/${next.need})`
+      + `<div class="ri-bar"><div class="ri-fill" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
+  } else {
+    el.innerHTML = `🏡 RANCH LEVEL <b>${level}</b> · ${tier.name} — fully built! 🎉`;
+  }
+}
 function openJobs() { refreshJobs(); $('jobsScreen').classList.add('show'); }
 
 // A little barn interior showing the critters currently on the job.
@@ -576,19 +447,81 @@ function onRunEnd(dist, clears) {
 }
 
 let pendingEvolve = null;
+// Stop every minigame controller and hide its canvas — used on results-continue.
+function stopAllMinigames() {
+  ['run', 'whack', 'catch', 'fishing', 'rhythm'].forEach((id) => { $(id).style.display = 'none'; });
+  runner.stop(); whack.stop(); catchGame.stop(); fishGame.stop(); rhythmGame.stop();
+}
 $('resContinue').addEventListener('click', () => {
   $('results').classList.remove('show');
-  $('run').style.display = 'none';
-  $('whack').style.display = 'none';
   $('runhud').classList.remove('show');
-  runner.stop();
-  whack.stop();
+  stopAllMinigames();
   exitMinigame();
   if (pendingEvolve) {
     showEvolution(pendingEvolve);
     pendingEvolve = null;
   }
 });
+
+/* ============================================================
+   NEW MINIGAMES — Catch / Fishing / Rhythm share the start +
+   results machinery. Each earns coins + XP for the chosen cobbie
+   and feeds its own daily-challenge metric.
+   ============================================================ */
+// Shared results/reward flow for a finished minigame round.
+function finishMinigame(idx, o) {
+  const r = state.roster[idx] || state.roster[0];
+  state.coins += o.coins;
+  const before = r.stage;
+  r.xp += o.xp;
+  const after = stageFor(r.xp);
+  const evolved = after > before;
+  if (evolved) r.stage = after;
+  addProgress(state, 'coins', o.coins);
+  addProgress(state, 'games', 1);
+  state.stats.games++;
+  if (o.totalKey) state.stats[o.totalKey] = (state.stats[o.totalKey] || 0) + o.score;
+  if (o.bestKey) state.stats[o.bestKey] = Math.max(state.stats[o.bestKey] || 0, o.score);
+  farm.sync(); persist(); syncCoins();
+
+  const cd = CRITTERS[r.key];
+  $('resTitle').textContent = o.title;
+  $('resName').textContent = `${displayName(r)} · ${cd.stageNames[r.stage]}`;
+  $('resStat').innerHTML = o.statHTML;
+  $('resXP').textContent = '+' + o.xp + ' XP';
+  $('resCoins').textContent = '+' + o.coins + ' 🪙';
+  const rc = $('resCanvas').getContext('2d');
+  rc.clearRect(0, 0, 96, 96);
+  drawCritterCentered(rc, r.key, r.stage, r.hat, 96, 6);
+  setTimeout(() => $('results').classList.add('show'), 300);
+  pendingEvolve = evolved ? { key: r.key, before, after } : null;
+}
+// Generic launcher: hide menus, show the game's canvas, start it with the star.
+function launchGame(game, canvasId, idx) {
+  const r = state.roster[idx];
+  $('rosterScreen').classList.remove('show');
+  $('hubScreen').classList.remove('show');
+  $(canvasId).style.display = 'block';
+  enterMinigame();
+  game.start({ key: r.key, stage: r.stage, hat: r.hat });
+}
+
+let catchIdx = -1, fishIdx = -1, rhythmIdx = -1;
+function startCatchWith(idx) { catchIdx = idx; launchGame(catchGame, 'catch', idx); }
+function endCatch(score) {
+  finishMinigame(catchIdx, { title: 'NICE HAUL!', statHTML: `<b>${score}</b> caught`,
+    coins: score * 3, xp: score * 4, totalKey: 'catchHits', bestKey: 'catchBest', score });
+}
+function startFishWith(idx) { fishIdx = idx; launchGame(fishGame, 'fishing', idx); }
+function endFishing(score) {
+  finishMinigame(fishIdx, { title: 'REEL IN!', statHTML: `<b>${score}</b> fish`,
+    coins: score * 6, xp: score * 6, totalKey: 'fishHits', bestKey: 'fishBest', score });
+}
+function startRhythmWith(idx) { rhythmIdx = idx; launchGame(rhythmGame, 'rhythm', idx); }
+function endRhythm(score) {
+  finishMinigame(rhythmIdx, { title: 'ENCORE!', statHTML: `<b>${score}</b> points`,
+    coins: score * 2, xp: score * 3, totalKey: 'rhythmHits', bestKey: 'rhythmBest', score });
+}
 
 /* ============================================================
    WHACK-A-COBBIE — creatures pop from holes; bonk them. Earns
@@ -602,7 +535,7 @@ function startWhackWith(idx) {
   $('hubScreen').classList.remove('show');
   $('whack').style.display = 'block';
   enterMinigame();
-  whack.start({ key: r.key, stage: r.stage, hat: r.hat });
+  whack.start({ key: r.key, stage: r.stage, hat: r.hat, hammer: state.hammer });
 }
 function endWhack(score) {
   const coins = score * 3;
@@ -617,6 +550,7 @@ function endWhack(score) {
   addProgress(state, 'coins', coins);
   addProgress(state, 'games', 1);
   state.stats.games++; state.stats.whackHits += score; // goal progress
+  state.stats.whackBest = Math.max(state.stats.whackBest || 0, score); // single-round best (hammer goals)
   farm.sync();
   persist();
   syncCoins();
@@ -826,13 +760,27 @@ function revealHatch(result) {
     addProgress(state, 'hatch', 1);
     state.stats.hatches++; // goals
     if (state.homeCritters.length < 10) state.homeCritters.push(result.key); // show new friend at home
+    const lvl = applyRanchLevel(state);         // a new friend may push the ranch to a new level
+    if (lvl.leveledUp) pendingRanchLevel = lvl; // celebrated after the hatch overlay closes
     persist(); renderChallenges();
   }
   farm.sync();
   $('hatchReveal').classList.add('show');
   $('hatchDone').style.display = 'block';
 }
-$('hatchDone').addEventListener('click', () => $('hatch').classList.remove('show'));
+// A new ranch level is revealed only after the player closes the hatch card,
+// so the two celebratory moments don't stack on top of each other.
+let pendingRanchLevel = null;
+function celebrateRanchLevel(res) {
+  const tier = ranchTier(res.level);
+  const capGained = res.gained.reduce((s, t) => s + t.capBonus, 0);
+  beep(() => sfx.coin());
+  toast(`🏡 RANCH LEVEL ${res.level} — ${tier.name}! You unlocked ${tier.adds}${capGained ? ` and +${capGained} ranch space` : ''}.`, 5200);
+}
+$('hatchDone').addEventListener('click', () => {
+  $('hatch').classList.remove('show');
+  if (pendingRanchLevel) { celebrateRanchLevel(pendingRanchLevel); pendingRanchLevel = null; }
+});
 
 /* ============================================================
    COLLECTION (DEX) + CHARACTER CARD
@@ -1016,20 +964,26 @@ $('renameCancel').addEventListener('click', () => $('renameModal').classList.rem
 $('playBig').addEventListener('click', openHub);
 $('challengesbtn').addEventListener('click', openChallenges);
 $('challengesBack').addEventListener('click', () => $('challengesScreen').classList.remove('show'));
-$('chalClaim').addEventListener('click', () => {
-  const reward = claimDaily(state);
-  if (reward) { state.coins += reward; persist(); syncCoins(); beep(() => sfx.coin()); }
-  renderChallenges();
-});
 function openChallenges() { renderChallenges(); $('challengesScreen').classList.add('show'); }
 function renderChallenges() {
-  const d = ensureDaily(state);
-  $('chalText').textContent = d.text;
-  $('chalFill').style.width = Math.round((d.progress / d.target) * 100) + '%';
-  $('chalProg').textContent = d.claimed ? 'Claimed for today ✓' : `${d.progress} / ${d.target}`;
-  const claim = $('chalClaim');
-  claim.textContent = d.claimed ? 'CLAIMED ✓' : `CLAIM +${d.reward} 🪙`;
-  claim.disabled = !d.done || d.claimed;
+  // daily challenges — one per minigame, each claimed on its own
+  const dl = $('dailyList');
+  if (dl) {
+    dl.innerHTML = '';
+    for (const d of ensureDaily(state)) {
+      const row = document.createElement('div');
+      row.className = 'goal-row' + (d.claimed ? ' claimed' : d.done ? ' done' : '');
+      row.innerHTML = `
+        <div class="goal-top"><span class="goal-text">${d.emoji} ${d.text}</span><span class="goal-reward">+${d.reward} 🪙</span></div>
+        <div class="goal-bar"><div class="goal-fill" style="width:${Math.round((d.progress / d.target) * 100)}%"></div></div>
+        <div class="goal-prog">${d.progress} / ${d.target}</div>
+        ${d.done && !d.claimed ? '<button class="goal-claim">CLAIM REWARD</button>'
+          : d.claimed ? '<div class="goal-reward" style="text-align:center;margin-top:6px">Claimed ✓</div>' : ''}`;
+      dl.appendChild(row);
+      const btn = row.querySelector('.goal-claim');
+      if (btn) btn.addEventListener('click', () => claimDailyUI(d.id));
+    }
+  }
 
   // goals ladder
   const gl = $('goalsList');
@@ -1052,7 +1006,14 @@ function renderChallenges() {
       if (btn) btn.addEventListener('click', () => claimGoalUI(g));
     }
   }
-  $('challengesbtn').classList.toggle('ready', (d.done && !d.claimed) || anyGoalClaimable(state));
+  $('challengesbtn').classList.toggle('ready', anyDailyClaimable(state) || anyGoalClaimable(state));
+}
+function claimDailyUI(gameId) {
+  const reward = claimDaily(state, gameId);
+  if (!reward) return;
+  state.coins += reward; persist(); syncCoins(); beep(() => sfx.coin());
+  toast(`+${reward} 🪙 daily reward!`);
+  renderChallenges();
 }
 function claimGoalUI(g) {
   const reward = claimGoal(state, g);
@@ -1061,6 +1022,19 @@ function claimGoalUI(g) {
   toast('Unlocked ' + rewardText(reward) + '!');
   renderChallenges();
 }
+
+/* ============================================================
+   WIRE EXTRACTED UI SUBSYSTEMS — title / tutorial / settings live
+   in their own modules and receive what they need as dependencies.
+   ============================================================ */
+const title = initTitle(proceedFromTitle);
+const tutorial = initTutorial({ state, persist, farm, onClose: scheduleDialogue });
+initSettings({
+  state, persist, music, TRACKS,
+  // music start-up is gated by a one-shot flag owned here; hand the panel a
+  // tiny shim so it can (re)start playback without knowing about the flag.
+  audio: { startOnce: startMusicOnce, stop: () => music.stop(), reset: () => { musicStarted = false; } },
+});
 
 /* ---------- go ---------- */
 boot();

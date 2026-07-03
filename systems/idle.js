@@ -69,8 +69,10 @@ export function stationOf(state, key) {
 /** Coin cost to expand the ranch by CAP_STEP slots at the current capacity. */
 export const CAP_STEP = 2;
 export function expandCost(capacity) {
-  // linear so the ranch can realistically grow all the way to a big roster
-  return Math.round(40 + Math.max(0, capacity - 8) * 10);
+  // Gentle linear ramp. Reaching capacity ~150 (needed to hold all 150 cobbies)
+  // costs ~32k total; combined with hatching + the day-capped idle/daily faucets,
+  // a full collection paces to ~a month of daily play (see systems/ranch.js bonuses).
+  return Math.round(30 + Math.max(0, capacity - 8) * 6);
 }
 export function canExpand(state) {
   return state.coins >= expandCost(state.capacity);

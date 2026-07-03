@@ -11,6 +11,7 @@
 
 import { stageFor } from '../data/creatures.js';
 import { defaultAvatar } from '../data/avatar.js';
+import { ranchLevelFor } from './ranch.js';
 
 const KEY = 'cobbies.save.v1';
 
@@ -45,12 +46,16 @@ export function defaultState() {
     roster,
     pity: 0,
     capacity: 8,   // ranch starts small; expand it with idle coins
+    ranchLevelSeen: 1, // highest ranch level whose rewards were granted (see systems/ranch.js)
     homeCritters: roster.map((r) => r.key), // which critters wander the home farm (max 10)
     avatar: defaultAvatar(),
     buddy: 'nora',
-    daily: null,   // filled in by ensureDaily() on boot
+    dailies: null, // filled in by ensureDaily() on boot (one challenge per minigame)
     stations: { berry: { key: null, since: 0 }, pond: { key: null, since: 0 }, lookout: { key: null, since: 0 } },
-    stats: { games: 0, whackHits: 0, hatches: 0, runBest: 0 }, // lifetime counters for goals
+    stats: { games: 0, whackHits: 0, hatches: 0, runBest: 0, whackBest: 0, // lifetime counters for goals
+      catchHits: 0, fishHits: 0, rhythmHits: 0, catchBest: 0, fishBest: 0, rhythmBest: 0 },
+    hammer: 'wood',           // equipped whack mallet skin
+    ownedHammers: ['wood'],   // unlocked mallet skins (default is free)
     ownedHats: [],            // hats bought in the shop
     goalsClaimed: [],         // ids of completed+claimed goals
     unlockedBiomes: ['meadow'], // scenes unlocked via goals
@@ -106,6 +111,8 @@ function migrate(s) {
     stations: { ...base.stations, ...(s.stations || {}) },
     stats: { ...base.stats, ...(s.stats || {}) },
     ownedHats: Array.isArray(s.ownedHats) ? s.ownedHats : [],
+    hammer: s.hammer || 'wood',
+    ownedHammers: Array.isArray(s.ownedHammers) && s.ownedHammers.length ? s.ownedHammers : ['wood'],
     goalsClaimed: Array.isArray(s.goalsClaimed) ? s.goalsClaimed : [],
     // existing saves keep access to every scene; new games start with meadow only
     unlockedBiomes: Array.isArray(s.unlockedBiomes) ? s.unlockedBiomes : ['meadow', 'desert', 'snow', 'dusk'],
@@ -128,5 +135,7 @@ function migrate(s) {
     hat: r.hat ?? null,
     stage: stageFor(r.xp | 0),
   }));
+  // Saves predating ranch levels start "caught up" — no retroactive bonus/celebration.
+  state.ranchLevelSeen = s.ranchLevelSeen ?? ranchLevelFor(state.roster.length);
   return state;
 }
