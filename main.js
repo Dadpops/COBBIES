@@ -184,15 +184,8 @@ function drawTitleNora(cv, t) {
   // soft shadow
   ctx.fillStyle = 'rgba(0,0,0,.14)';
   ctx.beginPath(); ctx.ellipse(W / 2, oy + 15 * cell, 8 * cell, 2 * cell, 0, 0, 6.28); ctx.fill();
+  // the real in-game Nora sprite, unmodified
   drawPix(ctx, CRITTERS.nora.stages[2], PALS.nora, ox, oy, cell);
-  // enlarge eyes (nora eyes = index 7 at row 6, cols 6 & 9) for legibility
-  for (const c of [6, 9]) {
-    const ex = ox + c * cell + cell / 2, ey = oy + 6 * cell + cell / 2;
-    ctx.fillStyle = '#20161a';
-    ctx.beginPath(); ctx.arc(ex, ey, cell * 0.9, 0, 6.28); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(ex + cell * 0.3, ey - cell * 0.3, cell * 0.32, 0, 6.28); ctx.fill();
-  }
 }
 let titleRaf = 0, titleT = 0;
 function showTitle() {
