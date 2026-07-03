@@ -9,6 +9,7 @@
 import { CRITTERS, PALS } from '../data/creatures.js';
 import { drawPix } from '../render/pixel.js';
 import { drawCritter } from '../render/critter.js';
+import { hammer as hammerFor, drawHammer } from '../data/hammers.js';
 
 const DURATION = 30;
 
@@ -26,8 +27,8 @@ export function createWhack(canvas, opts) {
 
   function layout() {
     holes = [];
-    const cols = 3, rows = 2;
-    const marginX = W * 0.15, top = H * 0.4, gapX = (W - 2 * marginX) / (cols - 1), gapY = H * 0.25;
+    const cols = 3, rows = 3;
+    const marginX = W * 0.15, top = H * 0.36, gapX = (W - 2 * marginX) / (cols - 1), gapY = H * 0.22;
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++)
         holes.push({ x: marginX + gapX * c, y: top + gapY * r, up: 0, dir: 0, active: false, bomb: false, key: null, tUp: 0, pop: 0 });
@@ -81,13 +82,9 @@ export function createWhack(canvas, opts) {
   function drawPlayer() {
     if (!player) return;
     const cx = cursor.x, cy = cursor.y;
-    const hx = cx - 6, hy = (cy - 24) + 22 * swing; // mallet head: raised, slams to cursor on tap
-    ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hx + 5, hy + 6); ctx.lineTo(cx + 14, cy - 4); ctx.stroke();
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(hx - 8, hy, 18, 10);
-    ctx.fillStyle = '#787e86'; ctx.fillRect(hx - 8, hy, 18, 3);
     ctx.fillStyle = 'rgba(0,0,0,.16)';
     ctx.beginPath(); ctx.ellipse(cx + 20, cy + 14, 14, 5, 0, 0, 6.28); ctx.fill();
+    drawHammer(ctx, hammerFor(player.hammer), cx, cy, 1, swing); // mallet slams to cursor on tap
     drawCritter(ctx, player.key, player.stage, player.hat, cx + 2, cy - 30, 3);
   }
 

@@ -97,13 +97,8 @@
     <button class="backbtn" id="challengesBack">‹</button>
     <h2>CHALLENGES</h2>
     <div class="chal-scroll">
-      <div class="goals-head">⭐ DAILY · EARN COINS</div>
-      <div class="chal-card">
-        <div class="chal-text" id="chalText">—</div>
-        <div class="chal-bar"><div class="chal-fill" id="chalFill"></div></div>
-        <div class="chal-prog" id="chalProg">—</div>
-        <button class="btn" id="chalClaim">CLAIM</button>
-      </div>
+      <div class="goals-head">⭐ DAILY · ONE PER GAME</div>
+      <div id="dailyList"></div>
       <div class="goals-head">🏆 LIFETIME · UNLOCKS</div>
       <div id="goalsList"></div>
     </div>
@@ -130,6 +125,7 @@
     <button class="backbtn" id="jobsBack">‹</button>
     <h2>THE BARN</h2>
     <div class="sub">STATION CRITTERS TO EARN COINS OVER TIME</div>
+    <div class="ranch-info" id="ranchInfo"></div>
     <canvas id="barnScene" class="barn-scene" width="380" height="120"></canvas>
     <div id="jobsList"></div>
   </div>
@@ -163,9 +159,30 @@
         <span class="hub-emoji">🔨</span>
         <span class="hub-info"><b>WHACK-A-COBBIE</b><span>Bonk the pop-ups · 30s, speeds up</span></span>
       </button>
+      <button class="hub-card" id="hubCatch">
+        <span class="hub-emoji">🧺</span>
+        <span class="hub-info"><b>CATCH</b><span>Catch falling treats · dodge bombs</span></span>
+      </button>
+      <button class="hub-card" id="hubFish">
+        <span class="hub-emoji">🎣</span>
+        <span class="hub-info"><b>FISHING</b><span>Tap in the green to hook a fish</span></span>
+      </button>
+      <button class="hub-card" id="hubRhythm">
+        <span class="hub-emoji">🎵</span>
+        <span class="hub-info"><b>RHYTHM</b><span>Tap to the beat · build combos</span></span>
+      </button>
     </div>
     <button class="hub-buddy" id="hubBuddy">📣 BUDDY: <b id="hubBuddyName">NORA</b> · CHANGE ›</button>
+    <button class="hub-buddy" id="hubHammer">🔨 HAMMER: <b id="hubHammerName">WOODEN</b> · CHANGE ›</button>
     <button class="hub-buddy" id="musicToggle">🔊 MUSIC: ON</button>
+  </div>
+
+  <!-- HAMMER SKINS -->
+  <div class="screen" id="hammerScreen">
+    <button class="backbtn" id="hammerBack">‹</button>
+    <h2>HAMMER SKINS</h2>
+    <div class="sub">FOR WHACK-A-COBBIE · UNLOCK MORE VIA GOALS</div>
+    <div id="hammerGrid"></div>
   </div>
 
   <!-- BUDDY SELECT -->
@@ -212,6 +229,9 @@
   <!-- RUN -->
   <canvas id="run" style="display:none"></canvas>
   <canvas id="whack" style="display:none"></canvas>
+  <canvas id="catch" style="display:none"></canvas>
+  <canvas id="fishing" style="display:none"></canvas>
+  <canvas id="rhythm" style="display:none"></canvas>
   <div id="runhud">
     <div class="hud-dist"><span class="hud-lbl">DISTANCE</span><span id="dist">0</span></div>
     <div class="hud-dist"><span class="hud-lbl">RUNNER</span><span id="runnerName">—</span></div>

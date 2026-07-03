@@ -29,23 +29,26 @@ function evoPct(owned) {
  * @param {HTMLElement} container
  * @param {import('../systems/save.js').OwnedCreature[]} roster
  * @param {(index:number)=>void} onPick
+ * @param {string|null} [disabledKey]  a creature that can't star (the buddy)
  */
-export function renderRoster(container, roster, onPick) {
+export function renderRoster(container, roster, onPick, disabledKey = null) {
   container.innerHTML = '';
   roster.forEach((r, i) => {
     const cd = CRITTERS[r.key];
+    // The cheerleader buddy is already busy cheering — it can't also star.
+    const off = r.key === disabledKey;
     const card = document.createElement('div');
-    card.className = 'rcard';
+    card.className = 'rcard' + (off ? ' busy' : '');
     card.innerHTML = `<canvas width="48" height="48"></canvas>
       <div class="rinfo">
         <div class="rname">${displayName(r)}</div>
         <div class="rmeta">${cd.stageNames[r.stage]} · LVL ${r.stage + 1} · ${r.xp} XP</div>
         <div class="xpbar"><div class="xpfill" style="width:${evoPct(r)}%"></div></div>
-      </div><div class="rgo">RUN ›</div>`;
+      </div><div class="rgo">${off ? '📣 CHEERING' : 'RUN ›'}</div>`;
     container.appendChild(card);
     const cc = card.querySelector('canvas').getContext('2d');
     drawCritter(cc, r.key, r.stage, r.hat, 0, 0, 3);
-    card.addEventListener('click', () => onPick(i));
+    if (!off) card.addEventListener('click', () => onPick(i));
   });
 }
 

@@ -107,6 +107,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
   padding:12px;display:flex;align-items:center;gap:14px;cursor:pointer;
   box-shadow:3px 3px 0 rgba(0,0,0,.2);transition:transform .1s}
 .rcard:active{transform:scale(.98)}
+.rcard.busy{opacity:.5;cursor:default;box-shadow:none}
+.rcard.busy:active{transform:none}
+.rcard.busy .rgo{color:#8a7a5a}
 .rcard canvas{position:static;width:64px;height:64px;flex-shrink:0}
 .rinfo{flex:1}
 .rname{font-size:12px;letter-spacing:.08em;font-weight:700}
@@ -377,8 +380,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 .chal-card .btn:disabled{background:#b0b0b0;border-bottom-color:#808080;opacity:.7}
 
 /* ---- hat picker ---- */
-#hatGrid{flex:1;overflow-y:auto;padding:0 16px 24px;display:grid;grid-template-columns:repeat(3,1fr);
+#hatGrid,#hammerGrid{flex:1;overflow-y:auto;padding:0 16px 24px;display:grid;grid-template-columns:repeat(3,1fr);
   gap:12px;align-content:start}
+#hammerGrid canvas{image-rendering:pixelated}
+.hatcell .hatgoal{font-size:7px;letter-spacing:.03em;color:#b08a5a;text-align:center;line-height:1.3}
 .hatcell{background:var(--paper);border:3px solid var(--line);border-radius:14px;padding:12px 6px;
   display:flex;flex-direction:column;align-items:center;gap:5px;box-shadow:2px 2px 0 rgba(0,0,0,.2);cursor:pointer}
 .hatcell:active{transform:scale(.97)}
@@ -416,6 +421,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelate
 .barn-scene{position:static;width:calc(100% - 32px);max-width:360px;height:auto;
   margin:0 auto 8px;border:3px solid #33240f;border-radius:12px;image-rendering:pixelated;
   box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.ranch-info{margin:2px auto 10px;max-width:360px;text-align:center;font-size:11px;
+  letter-spacing:.05em;color:#ffe9b8;line-height:1.5}
+.ranch-info b{color:#ffd24a}
+.ranch-info .ri-bar{height:6px;background:rgba(0,0,0,.28);border-radius:4px;overflow:hidden;margin:5px auto 0;max-width:240px}
+.ranch-info .ri-fill{height:100%;background:#f0a24a;border-radius:4px;transition:width .5s}
 #dexScreen{background:linear-gradient(180deg,#3f6a3a,#26401f)}
 #dexScreen h2, #jobsScreen h2{color:#fff}
 .hatcell.busy{opacity:.5}

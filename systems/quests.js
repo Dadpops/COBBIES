@@ -8,6 +8,7 @@
 
 import { HATS } from '../data/cosmetics.js';
 import { BIOMES } from '../data/biomes.js';
+import { HAMMERS } from '../data/hammers.js';
 
 const METRICS = {
   collected: (s) => s.roster.length,
@@ -15,6 +16,7 @@ const METRICS = {
   prime: (s) => s.roster.filter((r) => r.stage >= 2).length,
   games: (s) => s.stats.games,
   whacks: (s) => s.stats.whackHits,
+  whackBest: (s) => s.stats.whackBest || 0,
   hatches: (s) => s.stats.hatches,
   runBest: (s) => s.stats.runBest,
 };
@@ -33,6 +35,12 @@ export const GOALS = [
   { id: 'h10',   text: 'Hatch 10 critters',         metric: 'hatches',   target: 10,  reward: { type: 'hat', id: 'straw' } },
   { id: 'c40',   text: 'Collect 40 critters',       metric: 'collected', target: 40,  reward: { type: 'hat', id: 'tophat' } },
   { id: 'g15',   text: 'Play 15 minigames',         metric: 'games',     target: 15,  reward: { type: 'capacity', amount: 5 } },
+  // Whack-a-Cobbie hammer skins — unlocked by bonking milestones + single-round scores.
+  { id: 'ham_steel', text: 'Bonk 120 cobbies total',       metric: 'whacks',    target: 120, reward: { type: 'hammer', id: 'steel' } },
+  { id: 'ham_candy', text: 'Score 25 in one Whack round',  metric: 'whackBest', target: 25,  reward: { type: 'hammer', id: 'candy' } },
+  { id: 'ham_stone', text: 'Bonk 300 cobbies total',       metric: 'whacks',    target: 300, reward: { type: 'hammer', id: 'stone' } },
+  { id: 'ham_gold',  text: 'Score 40 in one Whack round',  metric: 'whackBest', target: 40,  reward: { type: 'hammer', id: 'gold' } },
+  { id: 'ham_mega',  text: 'Bonk 600 cobbies total',       metric: 'whacks',    target: 600, reward: { type: 'hammer', id: 'mega' } },
 ];
 
 export function goalValue(state, goal) { return METRICS[goal.metric](state); }
@@ -43,6 +51,7 @@ export function goalClaimed(state, goal) { return state.goalsClaimed.includes(go
 export function rewardText(reward) {
   if (reward.type === 'coins') return `+${reward.amount} 🪙`;
   if (reward.type === 'hat') return `🎩 ${HATS[reward.id]?.name || reward.id}`;
+  if (reward.type === 'hammer') return `🔨 ${HAMMERS[reward.id]?.name || reward.id}`;
   if (reward.type === 'biome') return `🗺️ ${BIOMES[reward.id]?.name || reward.id}`;
   if (reward.type === 'capacity') return `+${reward.amount} space`;
   return '';
@@ -54,6 +63,7 @@ export function claimGoal(state, goal) {
   const r = goal.reward;
   if (r.type === 'coins') state.coins += r.amount;
   else if (r.type === 'hat') { if (!state.ownedHats.includes(r.id)) state.ownedHats.push(r.id); }
+  else if (r.type === 'hammer') { if (!state.ownedHammers.includes(r.id)) state.ownedHammers.push(r.id); }
   else if (r.type === 'biome') { if (!state.unlockedBiomes.includes(r.id)) state.unlockedBiomes.push(r.id); }
   else if (r.type === 'capacity') state.capacity += r.amount;
   state.goalsClaimed.push(goal.id);

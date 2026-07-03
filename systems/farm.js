@@ -14,6 +14,7 @@ import { BIOMES, DEFAULT_BIOME } from '../data/biomes.js';
 import { drawAvatar } from '../data/avatar.js';
 import { drawPix } from '../render/pixel.js';
 import { drawCritter } from '../render/critter.js';
+import { ranchLevelFor } from './ranch.js';
 
 export const AVATAR_KEY = '__avatar__';
 
@@ -165,6 +166,99 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
     }
   }
 
+  /* ---------- ranch-level scenery (grows with your collection) ----------
+     The ranch fills in as you collect more cobbies: a paved road, then a
+     village, street lamps, and finally a lit-up city skyline on the horizon.
+     Drawn in two passes: FAR (skyline, behind the hills) and NEAR (road,
+     cottages, lamps — in front of the hills, behind the roaming critters). */
+
+  // Stable pseudo-random from an index, so scenery doesn't jitter frame-to-frame.
+  function rnd(i) { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
+  // Distant city skyline on the horizon. Appears at level 6 (town), windows
+  // light up at 7 (city lights), densest with a blinking beacon at 8 (metropolis).
+  function drawSkyline(level) {
+    if (level < 6) return;
+    const count = level >= 8 ? 15 : level >= 7 ? 11 : 7;
+    const baseY = FH * 0.52;                 // feet sit here; the far hill covers below
+    const lit = level >= 7;
+    const maxH = level >= 8 ? 92 : 62;
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const x = FW * (0.04 + t * 0.92);
+      const w = 15 + rnd(i) * 15;
+      const h = 26 + rnd(i * 2.7) * maxH;
+      ctx.fillStyle = '#5b6180';
+      ctx.fillRect(x - w / 2, baseY - h, w, h);
+      ctx.fillStyle = '#6b7196';             // faint left/sunlit edge
+      ctx.fillRect(x - w / 2, baseY - h, 2, h);
+      for (let wy = baseY - h + 6; wy < baseY - 8; wy += 8)
+        for (let wx = x - w / 2 + 4; wx < x + w / 2 - 3; wx += 7) {
+          const on = lit && rnd(wx * 0.31 + wy * 0.7) > 0.45;
+          ctx.fillStyle = on ? '#ffe08a' : '#464c6a';
+          ctx.fillRect(wx, wy, 3, 4);
+        }
+    }
+    if (level >= 8) {                        // slow-blinking beacon on a central tower
+      const on = Math.sin(ft * 2) > 0;
+      ctx.fillStyle = on ? 'rgba(255,96,96,.95)' : 'rgba(255,96,96,.28)';
+      ctx.beginPath(); ctx.arc(FW * 0.5, baseY - maxH - 22, 3, 0, 6.28); ctx.fill();
+    }
+  }
+
+  function drawCottage(x, y, s) {
+    const w = 20 * s, h = 14 * s;
+    ctx.fillStyle = '#e8d4a8'; ctx.fillRect(x - w / 2, y - h, w, h);            // wall
+    ctx.fillStyle = '#b5654a';                                                 // roof
+    ctx.beginPath(); ctx.moveTo(x - w / 2 - 3 * s, y - h); ctx.lineTo(x, y - h - 10 * s); ctx.lineTo(x + w / 2 + 3 * s, y - h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a4a2a'; ctx.fillRect(x - 3 * s, y - 8 * s, 6 * s, 8 * s); // door
+    ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x + 3 * s, y - h + 3 * s, 4 * s, 4 * s); // lit window
+  }
+
+  function drawLamp(x, ry) {
+    ctx.fillStyle = '#3f3a34';
+    ctx.fillRect(x - 1.5, ry - 26, 3, 26);   // post
+    ctx.fillRect(x - 1.5, ry - 26, 11, 3);   // arm
+    ctx.save(); ctx.globalAlpha = 0.32; ctx.fillStyle = '#ffdf9a';
+    ctx.beginPath(); ctx.arc(x + 9, ry - 21, 12, 0, 6.28); ctx.fill(); ctx.restore(); // glow
+    ctx.fillStyle = '#ffd98a'; ctx.beginPath(); ctx.arc(x + 9, ry - 22, 3.4, 0, 6.28); ctx.fill();
+  }
+
+  // Foreground scenery in front of the hills. `roadY` anchors the road band.
+  function drawRanchNear(level) {
+    const roadY = FH * 0.635, roadH = FH * 0.045;
+
+    // village cottages on the horizon (interspersed with the game buildings)
+    if (level >= 3) {
+      const spots = [0.60, 0.24, 0.78, 0.42];        // added in this order as the village grows
+      const n = level >= 5 ? 4 : level >= 4 ? 3 : 1;
+      for (let i = 0; i < n; i++) drawCottage(FW * spots[i], FH * 0.545, 0.82);
+      // a little garden plot beside the first cottage
+      for (let r = 0; r < 3; r++) {
+        const py = FH * 0.60 + r * 6;
+        ctx.fillStyle = '#6a4a2a'; ctx.fillRect(FW * 0.52, py, FW * 0.14, 3);
+        ctx.fillStyle = '#5aa84a';
+        for (let x = FW * 0.53; x < FW * 0.65; x += 9) ctx.fillRect(x, py - 3, 2, 4);
+      }
+    }
+
+    // paved road across the mid-ground + a roadside fence
+    if (level >= 2) {
+      ctx.fillStyle = '#8f8880'; ctx.fillRect(0, roadY, FW, roadH);
+      ctx.fillStyle = '#a8a098'; ctx.fillRect(0, roadY, FW, 3);              // near kerb
+      ctx.fillStyle = '#7a736c'; ctx.fillRect(0, roadY + roadH - 2, FW, 2); // far edge
+      ctx.fillStyle = '#e6dcc4';                                            // dashed centre line
+      const cy = roadY + roadH / 2 - 1;
+      for (let x = ((ft * 12) % 26) - 26; x < FW; x += 26) ctx.fillRect(x, cy, 12, 2);
+      ctx.fillStyle = '#caa96f';                                           // fence just above road
+      for (let x = 8; x < FW; x += 24) ctx.fillRect(x, roadY - 12, 3, 12);
+      ctx.fillRect(0, roadY - 9, FW, 2);
+    }
+
+    // street lamps standing along the road
+    if (level >= 5) for (const f of [0.14, 0.5, 0.86]) drawLamp(FW * f, roadY);
+  }
+
   /* ---------- buildings ---------- */
   function label(x, y, text) {
     ctx.font = 'bold 12px ui-monospace, monospace';
@@ -232,13 +326,17 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
     g.addColorStop(0.6, b.horizon); g.addColorStop(1, b.ground);
     ctx.fillStyle = g; ctx.fillRect(0, 0, FW, FH);
 
+    const level = ranchLevelFor(getState().roster.length);
+
     if (b.stars) drawStars();
     if (b.moon) drawMoon(b.sky[0]);
     if (b.sun) drawSun(b.sun);
     if (b.clouds) drawClouds();               // farthest back — behind the hills
+    drawSkyline(level);                        // distant city, tucked behind the hills
     hillBand(b.hillA, 0.5, 16, 0.15, 0);
     hillBand(b.hillB, HILL_FRONT, 12, 0.28, 2);
     drawDecor(b);
+    drawRanchNear(level);                      // road / village / lamps, in front of the hills
     drawTufts();
 
     // depth-sorted drawables: buildings + wanderers

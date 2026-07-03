@@ -60,6 +60,15 @@ export function createSfx() {
       tone('sine', 190, 70, t, 0.11, 0.24); // body thump
     },
 
+    // A rubber-toy squeak: a quick up-chirp then a shorter down-chirp. Paired
+    // with a light thump so bonking a cobbie feels like squishing a squeaky toy.
+    squeak() {
+      const c = ensure(); if (!c) return; const t = c.currentTime;
+      tone('square', 620, 1180, t, 0.07, 0.13);
+      tone('square', 1180, 720, t + 0.055, 0.09, 0.11);
+      tone('sine', 170, 90, t, 0.08, 0.14); // soft body thud under the squeak
+    },
+
     bomb() {
       const c = ensure(); if (!c) return; const t = c.currentTime;
       const src = c.createBufferSource(); src.buffer = noise(0.5);
