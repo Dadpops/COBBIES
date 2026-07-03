@@ -15,6 +15,7 @@
  */
 
 import { EXTRA_PALS, EXTRA_CRITTERS } from './creatures_extra.js';
+import { generateBank } from './generator.js';
 
 export const RARITY = {
   common:    { label: 'COMMON',    weight: 60, color: '#9ab' },
@@ -732,11 +733,20 @@ export const CRITTERS = {
   },
 };
 
-// Merge in the Phase-3 expansion pack (takes the bank to ~25).
+// Merge in the Phase-3 expansion pack (takes the bank to ~25 hand-made heroes).
 Object.assign(PALS, EXTRA_PALS);
 Object.assign(CRITTERS, EXTRA_CRITTERS);
+
+// Merge in the procedurally generated bank (heroes + ~125 = ~150 total).
+// Generated critters unlock as the ranch grows (see unlockAt).
+const GEN = generateBank(125, 10);
+Object.assign(PALS, GEN.pals);
+Object.assign(CRITTERS, GEN.critters);
 
 /** Species that can appear from an egg (Nora is a gift, never hatched). */
 export const HATCH_POOL = Object.keys(CRITTERS).filter(
   (k) => CRITTERS[k].hatchable !== false
 );
+
+/** Total collectable species (for the dex counter). */
+export const TOTAL_SPECIES = 1 + HATCH_POOL.filter((k) => k !== 'nora').length;

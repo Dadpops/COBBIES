@@ -34,7 +34,10 @@ export const PITY_LIMIT = 10; // random eggs without a legendary -> forced
  */
 function rollSpecies(state) {
   const owned = new Set(state.roster.map((r) => r.key));
-  const pool = HATCH_POOL.filter((k) => !owned.has(k));
+  // only critters your ranch has unlocked (unlockAt <= capacity) and don't own
+  const pool = HATCH_POOL.filter(
+    (k) => !owned.has(k) && (CRITTERS[k].unlockAt ?? 8) <= state.capacity
+  );
   if (!pool.length) return { key: null, pityTriggered: false };
 
   if (state.pity >= PITY_LIMIT - 1) {

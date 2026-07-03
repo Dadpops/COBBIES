@@ -69,7 +69,8 @@ export function stationOf(state, key) {
 /** Coin cost to expand the ranch by CAP_STEP slots at the current capacity. */
 export const CAP_STEP = 2;
 export function expandCost(capacity) {
-  return Math.round(60 * Math.pow(1.35, Math.max(0, (capacity - 8) / CAP_STEP)));
+  // linear so the ranch can realistically grow all the way to a big roster
+  return Math.round(40 + Math.max(0, capacity - 8) * 10);
 }
 export function canExpand(state) {
   return state.coins >= expandCost(state.capacity);

@@ -490,7 +490,11 @@ $('hatchMenuBack').addEventListener('click', () => $('hatchMenu').classList.remo
 
 function remainingToFind() {
   const owned = new Set(state.roster.map((r) => r.key));
-  return HATCH_POOL.filter((k) => !owned.has(k)).length;
+  return HATCH_POOL.filter((k) => !owned.has(k) && (CRITTERS[k].unlockAt ?? 8) <= state.capacity).length;
+}
+function lockedRemaining() {
+  const owned = new Set(state.roster.map((r) => r.key));
+  return HATCH_POOL.filter((k) => !owned.has(k) && (CRITTERS[k].unlockAt ?? 8) > state.capacity).length;
 }
 function openHatchMenu() {
   updatePityHint();
@@ -509,14 +513,16 @@ function updatePityHint() {
     return;
   }
   if (remaining === 0) {
-    $('pityHint').textContent = "You've collected every cobbie! 🎉";
+    $('pityHint').textContent = lockedRemaining() > 0
+      ? 'Hatched all you can! Expand your ranch in Jobs to unlock new critters.'
+      : "You've collected every cobbie! 🎉";
     return;
   }
   const left = PITY_LIMIT - state.pity;
   $('pityHint').textContent =
     left <= 3
       ? `A legendary is guaranteed within ${left} egg${left === 1 ? '' : 's'}!`
-      : `A random egg is always someone new — ${remaining} left to find.`;
+      : `A random egg is always someone new — ${remaining} unlocked to find.`;
 }
 
 $('eggRandom').addEventListener('click', () => {
@@ -533,7 +539,8 @@ $('eggDirect').addEventListener('click', () => {
   if (list.classList.contains('show')) { list.classList.remove('show'); return; }
   list.innerHTML = '';
   const ownedKeys = new Set(state.roster.map((r) => r.key));
-  for (const key of HATCH_POOL) {
+  const unlocked = HATCH_POOL.filter((k) => (CRITTERS[k].unlockAt ?? 8) <= state.capacity);
+  for (const key of unlocked) {
     const cd = CRITTERS[key];
     const owned = ownedKeys.has(key);
     const row = document.createElement('div');
