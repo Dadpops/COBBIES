@@ -93,6 +93,6 @@ function grant(state, key, pityTriggered) {
     owned.stage = stageFor(owned.xp);
     return { key, isDupe: true, pityTriggered, awardedXP: DUPE_XP };
   }
-  state.roster.push({ key, xp: 0, stage: 0, nickname: null });
+  state.roster.push({ key, xp: 0, stage: 0, nickname: null, hat: null });
   return { key, isDupe: false, pityTriggered, awardedXP: 0 };
 }

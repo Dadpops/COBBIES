@@ -14,6 +14,7 @@
   <div class="topbar">
     <span class="title">COBBIES</span>
     <div class="top-right">
+      <button class="iconbtn" id="challengesbtn" title="Challenges">⭐</button>
       <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
       <button class="iconbtn" id="settingsbtn" title="Settings">⚙️</button>
       <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
@@ -26,12 +27,8 @@
     <div class="dlg-bubble"><span id="dlgText">…</span></div>
   </div>
 
-  <!-- Daily challenge banner (main menu) -->
-  <button id="dailyBanner" class="daily">
-    <span class="daily-star">⭐</span>
-    <span class="daily-txt"><b id="dailyText">—</b><span id="dailyProg" class="daily-prog"></span></span>
-    <span id="dailyClaim" class="daily-claim">CLAIM</span>
-  </button>
+  <!-- Big PLAY button (bottom-centre of the ranch map) -->
+  <button id="playBig" class="playbig">▶ PLAY</button>
 
   <!-- Cheerleader buddy widget (shown during minigames) -->
   <div id="buddyBox" class="buddybox">
@@ -39,7 +36,6 @@
     <canvas id="buddyCanvas" width="48" height="48"></canvas>
   </div>
 
-  <div id="maphint" class="maphint">Tap a building to visit it</div>
 
   <!-- NAME ENTRY (first launch) -->
   <div class="screen center" id="nameScreen">
@@ -48,6 +44,27 @@
     <p class="intro">Welcome to the ranch. What should I call you?</p>
     <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
     <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- CHALLENGES -->
+  <div class="screen center" id="challengesScreen">
+    <button class="backbtn" id="challengesBack">‹</button>
+    <h2>CHALLENGES</h2>
+    <div class="chal-card">
+      <div class="chal-daily">⭐ DAILY CHALLENGE</div>
+      <div class="chal-text" id="chalText">—</div>
+      <div class="chal-bar"><div class="chal-fill" id="chalFill"></div></div>
+      <div class="chal-prog" id="chalProg">—</div>
+      <button class="btn" id="chalClaim">CLAIM</button>
+    </div>
+  </div>
+
+  <!-- HAT PICKER -->
+  <div class="screen" id="hatScreen">
+    <button class="backbtn" id="hatBack">‹</button>
+    <h2 id="hatTitle">CHOOSE A HAT</h2>
+    <div class="sub">TAP TO WEAR IT</div>
+    <div id="hatGrid"></div>
   </div>
 
   <!-- SHOP -->
@@ -205,6 +222,7 @@
       <div class="card-flavor">—</div>
       <div class="card-actions">
         <button class="btn sec" id="cardHome">🏠 ON FARM</button>
+        <button class="btn ghost" id="cardHat">🎩 HAT</button>
         <button class="btn ghost" id="cardRename">✏ NICKNAME</button>
         <button class="btn" id="cardClose">CLOSE</button>
       </div>

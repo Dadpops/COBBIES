@@ -13,20 +13,21 @@ import { CRITTERS, PALS } from '../data/creatures.js';
 import { BIOMES, DEFAULT_BIOME } from '../data/biomes.js';
 import { drawAvatar } from '../data/avatar.js';
 import { drawPix } from '../render/pixel.js';
+import { drawCritter } from '../render/critter.js';
 
 export const AVATAR_KEY = '__avatar__';
 
-const BAND_TOP = 0.62, BAND_BOTTOM = 0.9, BAND_L = 0.1, BAND_R = 0.9;
+// critters roam this lower band; buildings sit up on the horizon above it
+const BAND_TOP = 0.67, BAND_BOTTOM = 0.93, BAND_L = 0.1, BAND_R = 0.9;
 const HILL_FRONT = 0.58;
 
-// building layout: fractional position of each location's base point
+// Buildings live along the horizon: barn+pen left, nest middle, wardrobe+shop right.
 const BUILDINGS = [
-  { id: 'barn',     label: 'BARN',     x: 0.20, y: 0.66 },
-  { id: 'nest',     label: 'NEST',     x: 0.50, y: 0.63 },
-  { id: 'pen',      label: 'PEN',      x: 0.80, y: 0.66 },
-  { id: 'play',     label: 'PLAY',     x: 0.22, y: 0.85 },
-  { id: 'wardrobe', label: 'WARDROBE', x: 0.50, y: 0.88 },
-  { id: 'shop',     label: 'SHOP',     x: 0.78, y: 0.85 },
+  { id: 'barn',     label: 'BARN',     x: 0.13, y: 0.575 },
+  { id: 'pen',      label: 'PEN',      x: 0.31, y: 0.60 },
+  { id: 'nest',     label: 'NEST',     x: 0.50, y: 0.55 },
+  { id: 'wardrobe', label: 'WARDROBE', x: 0.70, y: 0.60 },
+  { id: 'shop',     label: 'SHOP',     x: 0.88, y: 0.575 },
 ];
 
 export function createFarm(canvas, getState, onPick, onBuilding) {
@@ -147,13 +148,12 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
 
   /* ---------- buildings ---------- */
   function label(x, y, text) {
-    ctx.font = 'bold 9px ui-monospace, monospace';
+    ctx.font = 'bold 12px ui-monospace, monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    const w = ctx.measureText(text).width + 10;
-    ctx.fillStyle = 'rgba(30,40,30,.55)';
-    roundRect(x - w / 2, y + 2, w, 13, 6); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.fillText(text, x, y + 9);
+    const w = ctx.measureText(text).width + 14;
+    ctx.fillStyle = 'rgba(28,38,28,.62)';
+    roundRect(x - w / 2, y + 3, w, 18, 8); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(text, x, y + 12.5);
   }
   function roundRect(x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -236,8 +236,12 @@ export function createFarm(canvas, getState, onPick, onBuilding) {
         ctx.fillStyle = 'rgba(0,0,0,.16)';
         ctx.beginPath(); ctx.ellipse(px, py, 15 * s, 5 * s, 0, 0, 6.28); ctx.fill();
         ctx.save(); ctx.translate(px, py); ctx.scale(s, s);
-        if (w.avatar) drawAvatar(ctx, getState().avatar, -24, -46 - bob, 3);
-        else drawPix(ctx, CRITTERS[w.key].stages[stageOf(w.key)], PALS[CRITTERS[w.key].type], -24, -44 - bob, 3);
+        if (w.avatar) {
+          drawAvatar(ctx, getState().avatar, -24, -46 - bob, 3);
+        } else {
+          const o = getState().roster.find((x) => x.key === w.key);
+          drawCritter(ctx, w.key, o ? o.stage : 0, o ? o.hat : null, -24, -44 - bob, 3);
+        }
         ctx.restore();
       } });
     }

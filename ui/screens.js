@@ -9,6 +9,7 @@ import { BIOMES } from '../data/biomes.js';
 import { AVATAR_OPTIONS, drawAvatar } from '../data/avatar.js';
 import { STATIONS, rateFor, accruedFor, expandCost } from '../systems/idle.js';
 import { drawPix, drawCentered } from '../render/pixel.js';
+import { drawCritter, drawCritterCentered } from '../render/critter.js';
 
 /** Display name for an owned creature (nickname overrides the default). */
 export function displayName(owned) {
@@ -43,7 +44,7 @@ export function renderRoster(container, roster, onPick) {
       </div><div class="rgo">RUN ›</div>`;
     container.appendChild(card);
     const cc = card.querySelector('canvas').getContext('2d');
-    drawPix(cc, cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
+    drawCritter(cc, r.key, r.stage, r.hat, 0, 0, 3);
     card.addEventListener('click', () => onPick(i));
   });
 }
@@ -63,7 +64,7 @@ export function renderCollection(container, state, onPick) {
       <div class="dname">${displayName(r)}</div>
       ${home.has(r.key) ? '<div class="home-badge">🏠</div>' : ''}`;
     container.appendChild(cell);
-    drawPix(cell.querySelector('canvas').getContext('2d'), cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
+    drawCritter(cell.querySelector('canvas').getContext('2d'), r.key, r.stage, r.hat, 0, 0, 3);
     cell.addEventListener('click', () => onPick(r.key));
   }
 }
@@ -290,5 +291,5 @@ export function renderCard(root, owned) {
   const canvas = root.querySelector('.card-canvas');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawCentered(ctx, cd.stages[owned.stage], PALS[cd.type], canvas.width, 6);
+  drawCritterCentered(ctx, owned.key, owned.stage, owned.hat, canvas.width, 6);
 }

@@ -34,9 +34,9 @@ const KEY = 'cobbies.save.v1';
 /** Brand-new player: Nora is the gift; two starters keep the farm warm. */
 export function defaultState() {
   const roster = [
-    { key: 'nora', xp: 40, stage: 0, nickname: null },
-    { key: 'pup',  xp: 60, stage: 0, nickname: null },
-    { key: 'frog', xp: 30, stage: 0, nickname: null },
+    { key: 'nora', xp: 40, stage: 0, nickname: null, hat: null },
+    { key: 'pup',  xp: 60, stage: 0, nickname: null, hat: null },
+    { key: 'frog', xp: 30, stage: 0, nickname: null, hat: null },
   ];
   roster.forEach((r) => (r.stage = stageFor(r.xp)));
   return {
@@ -115,6 +115,7 @@ function migrate(s) {
     key: r.key,
     xp: r.xp | 0,
     nickname: r.nickname ?? null,
+    hat: r.hat ?? null,
     stage: stageFor(r.xp | 0),
   }));
   return state;

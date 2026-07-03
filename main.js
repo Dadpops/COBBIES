@@ -16,6 +16,8 @@ import { createRunner } from './systems/run.js';
 import { createWhack } from './systems/whack.js';
 import { createMusic, TRACKS } from './audio/music.js';
 import { createSfx } from './audio/sfx.js';
+import { HAT_LIST } from './data/cosmetics.js';
+import { drawCritter } from './render/critter.js';
 import { ensureDaily, getDaily, addProgress, claim as claimDaily } from './systems/daily.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
@@ -46,7 +48,6 @@ function onBuilding(id) {
   if (id === 'barn') openJobs();
   else if (id === 'nest') openHatchMenu();
   else if (id === 'pen') openCollection();
-  else if (id === 'play') openHub();
   else if (id === 'wardrobe') openAvatar();
   else if (id === 'shop') openShop();
 }
@@ -81,8 +82,7 @@ let runActive = false;
 function enterMinigame() {
   document.querySelector('.topbar').style.display = 'none';
   $('dialogue').classList.remove('show');
-  $('dailyBanner').style.display = 'none';
-  $('maphint').style.display = 'none';
+  $('playBig').style.display = 'none';
   runActive = true;
   startBuddy();
   sfx.resume();
@@ -91,12 +91,11 @@ function enterMinigame() {
 }
 function exitMinigame() {
   document.querySelector('.topbar').style.display = '';
-  $('dailyBanner').style.display = '';
-  $('maphint').style.display = '';
+  $('playBig').style.display = '';
   runActive = false;
   stopBuddy();
   music.setIntensity(0);           // calm again on the farm — music keeps playing
-  renderDailyBanner();
+  renderChallenges();
 }
 
 /* ---------- music: plays across the whole game once started ---------- */
@@ -130,7 +129,7 @@ function boot() {
   const away = totalAccrued(state, Date.now());
   if (away > 0) { collectAll(state, Date.now()); toast(`🧺 Your ranch earned ${away} 🪙 while you were away!`); }
   persist();
-  renderDailyBanner();
+  renderChallenges();
   syncCoins();
   if (!state.playerName) {
     const ctx = $('noraIntro').getContext('2d');
@@ -448,12 +447,11 @@ function startBuddy() {
 }
 function buddyLoop() {
   const now = performance.now();
-  const cd = CRITTERS[state.buddy] || CRITTERS.nora;
   const owned = state.roster.find((r) => r.key === state.buddy);
   const c = $('buddyCanvas').getContext('2d');
   c.clearRect(0, 0, 48, 48);
   const bob = Math.abs(Math.sin(now / 130)) * 4; // excited hopping
-  drawPix(c, cd.stages[owned ? owned.stage : 0], PALS[cd.type], 0, 4 - bob, 3);
+  drawCritter(c, state.buddy || 'nora', owned ? owned.stage : 0, owned ? owned.hat : null, 0, 4 - bob, 3);
   if (now > buddyNextCheer) {
     $('buddyBubble').textContent = CHEERS[(Math.random() * CHEERS.length) | 0];
     $('buddyBubble').classList.add('show');
@@ -627,7 +625,7 @@ function revealHatch(result) {
   if (!result.isDupe) {
     addProgress(state, 'hatch', 1);
     if (state.homeCritters.length < 10) state.homeCritters.push(result.key); // show new friend at home
-    persist(); renderDailyBanner();
+    persist(); renderChallenges();
   }
   farm.sync();
   $('hatchReveal').classList.add('show');
@@ -701,6 +699,37 @@ function updateCardHome() {
   btn.classList.toggle('on', on);
 }
 
+/* ---------- critter hats ---------- */
+$('cardHat').addEventListener('click', () => { if (cardKey) openHatPicker(cardKey); });
+$('hatBack').addEventListener('click', () => $('hatScreen').classList.remove('show'));
+function openHatPicker(key) {
+  const owned = state.roster.find((r) => r.key === key);
+  if (!owned) return;
+  $('hatTitle').textContent = 'HAT FOR ' + displayName(owned);
+  const grid = $('hatGrid');
+  grid.innerHTML = '';
+  const none = document.createElement('div');
+  none.className = 'hatcell' + (owned.hat ? '' : ' on');
+  none.innerHTML = '<span class="hatemoji">🚫</span><span class="hatname">NONE</span>';
+  none.addEventListener('click', () => setHat(key, null));
+  grid.appendChild(none);
+  for (const h of HAT_LIST) {
+    const cell = document.createElement('div');
+    cell.className = 'hatcell' + (owned.hat === h.id ? ' on' : '');
+    cell.innerHTML = `<span class="hatemoji">${h.emoji}</span><span class="hatname">${h.name}</span>`;
+    cell.addEventListener('click', () => setHat(key, h.id));
+    grid.appendChild(cell);
+  }
+  $('hatScreen').classList.add('show');
+}
+function setHat(key, hatId) {
+  const owned = state.roster.find((r) => r.key === key);
+  if (!owned) return;
+  owned.hat = hatId; persist(); farm.sync();
+  openHatPicker(key);            // refresh selection highlight
+  renderCard($('card'), owned);  // update the card preview behind
+}
+
 /* ---------- shop ---------- */
 $('shopBack').addEventListener('click', () => $('shopScreen').classList.remove('show'));
 function openShop() { renderShop(); $('shopScreen').classList.add('show'); }
@@ -759,25 +788,26 @@ $('renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') com
 $('renameCancel').addEventListener('click', () => $('renameModal').classList.remove('show'));
 
 /* ============================================================
-   DAILY CHALLENGE — one rotating goal per day, fed by the games.
+   CHALLENGES — a ⭐ topbar button opens the daily challenge.
    ============================================================ */
-$('dailyBanner').addEventListener('click', () => {
-  const d = getDaily(state);
-  if (d.done && !d.claimed) {
-    const reward = claimDaily(state);
-    if (reward) { state.coins += reward; persist(); syncCoins(); }
-    renderDailyBanner();
-  }
+$('playBig').addEventListener('click', openHub);
+$('challengesbtn').addEventListener('click', openChallenges);
+$('challengesBack').addEventListener('click', () => $('challengesScreen').classList.remove('show'));
+$('chalClaim').addEventListener('click', () => {
+  const reward = claimDaily(state);
+  if (reward) { state.coins += reward; persist(); syncCoins(); beep(() => sfx.coin()); }
+  renderChallenges();
 });
-function renderDailyBanner() {
+function openChallenges() { renderChallenges(); $('challengesScreen').classList.add('show'); }
+function renderChallenges() {
   const d = ensureDaily(state);
-  $('dailyText').textContent = d.text;
-  $('dailyProg').textContent = d.claimed
-    ? 'Done for today ✓'
-    : d.done ? 'Complete · tap to claim' : `${d.progress} / ${d.target}`;
-  $('dailyClaim').textContent = `+${d.reward}🪙`;
-  $('dailyBanner').classList.toggle('done', d.done && !d.claimed);
-  $('dailyBanner').classList.toggle('claimed', d.claimed);
+  $('chalText').textContent = d.text;
+  $('chalFill').style.width = Math.round((d.progress / d.target) * 100) + '%';
+  $('chalProg').textContent = d.claimed ? 'Claimed for today ✓' : `${d.progress} / ${d.target}`;
+  const claim = $('chalClaim');
+  claim.textContent = d.claimed ? 'CLAIMED ✓' : `CLAIM +${d.reward} 🪙`;
+  claim.disabled = !d.done || d.claimed;
+  $('challengesbtn').classList.toggle('ready', d.done && !d.claimed);
 }
 
 /* ---------- go ---------- */
