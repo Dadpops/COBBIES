@@ -42,9 +42,19 @@ export const DIALOGUE = {
   ],
 };
 
+/** Warm, on-brand lines any creature can say — used for the newer cobbies. */
+export const GENERIC = [
+  "Hi {name}! So glad you stopped by.",
+  "Every run makes one of us a little bigger. Isn't that nice, {name}?",
+  "The ranch feels right when you're here, {name}.",
+  "Take a breath, {name}. We've got all the time in the world.",
+  "Did you know? You're someone's favourite person, {name}.",
+  "Whenever you're ready for a run, I'll be cheering.",
+];
+
 /** Pick a line for a species, with the player's name spliced in. */
 export function lineFor(key, playerName) {
-  const pool = DIALOGUE[key] || DIALOGUE.nora;
+  const pool = DIALOGUE[key] || GENERIC;
   const line = pool[(Math.random() * pool.length) | 0];
   return line.replace(/\{name\}/g, playerName || 'friend');
 }

@@ -13,7 +13,11 @@
 
   <div class="topbar">
     <span class="title">COBBIES</span>
-    <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
+    <div class="top-right">
+      <button class="iconbtn" id="avatarbtn" title="Your avatar">🧑</button>
+      <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
+      <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
+    </div>
   </div>
 
   <!-- Home dialogue bubble (Phase 2 seed) -->
@@ -43,6 +47,23 @@
     <h2>CHOOSE YOUR RUNNER</h2>
     <div class="sub">FARTHER = MORE XP · ONE HIT ENDS THE RUN</div>
     <div id="roster"></div>
+  </div>
+
+  <!-- AVATAR CREATOR -->
+  <div class="screen center" id="avatarScreen">
+    <button class="backbtn" id="avatarBack">‹</button>
+    <h2>YOUR AVATAR</h2>
+    <canvas id="avatarPreview" width="128" height="128"></canvas>
+    <div id="avatarOptions"></div>
+    <button class="btn" id="avatarDone">LOOKING GOOD</button>
+  </div>
+
+  <!-- SCENE / BIOME PICKER -->
+  <div class="screen" id="sceneScreen">
+    <button class="backbtn" id="sceneBack">‹</button>
+    <h2>CHOOSE A SCENE</h2>
+    <div class="sub">WHERE YOUR COBBIES CALL HOME</div>
+    <div id="sceneGrid"></div>
   </div>
 
   <!-- COLLECTION / DEX -->
@@ -117,6 +138,18 @@
       <div class="card-actions">
         <button class="btn ghost" id="cardRename">✏ RENAME</button>
         <button class="btn" id="cardClose">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RENAME MODAL (in-app; prompt() is blocked in embedded contexts) -->
+  <div id="renameModal" class="overlay-card">
+    <div class="card-inner">
+      <div class="card-name">RENAME</div>
+      <input id="renameInput" maxlength="14" placeholder="NEW NAME" autocomplete="off" />
+      <div class="card-actions">
+        <button class="btn ghost" id="renameCancel">CANCEL</button>
+        <button class="btn" id="renameSave">SAVE</button>
       </div>
     </div>
   </div>

@@ -15,6 +15,8 @@ import { drawPix } from '../render/pixel.js';
  */
 export function createRunner(canvas, onDistance, onEnd) {
   const ctx = canvas.getContext('2d');
+  const JUMP_V = -9.8;   // a touch floatier than the prototype for easier timing
+  const GRAV = 0.46;
   let RW = 0, RH = 0, raf = 0;
   /** @type {any} */
   let run = null;
@@ -29,7 +31,11 @@ export function createRunner(canvas, onDistance, onEnd) {
 
   function jump() {
     if (!run || !run.alive) return;
-    if (run.onGround) { run.vy = -9.4; run.onGround = false; }
+    if (run.onGround || run.coyote > 0) {
+      run.vy = JUMP_V; run.onGround = false; run.coyote = 0;
+    } else {
+      run.jumpBuffer = 8; // remember an early tap; fire it the instant we land
+    }
   }
 
   function start(creature) {
@@ -38,8 +44,8 @@ export function createRunner(canvas, onDistance, onEnd) {
     run = {
       key: creature.key, stage: creature.stage,
       x: RW * 0.35, y: groundY, vy: 0, groundY, onGround: true,
-      dist: 0, speed: 2.3, obstacles: [], spawnT: 0, alive: true, t: 0,
-      bg1: 0, bg2: 0, strideT: 0, dust: [],
+      dist: 0, speed: 2.3, obstacles: [], spawnT: 240, alive: true, t: 0,
+      bg1: 0, bg2: 0, strideT: 0, dust: [], coyote: 6, jumpBuffer: 0,
     };
     if (!raf) loop();
   }
@@ -50,8 +56,17 @@ export function createRunner(canvas, onDistance, onEnd) {
     if (run.speed < 6.5) run.speed += 0.0006; // capped ramp
     run.dist += run.speed * 0.5;
 
-    run.vy += 0.5; run.y += run.vy;
-    if (run.y >= run.groundY) { run.y = run.groundY; run.vy = 0; run.onGround = true; }
+    // coyote time: brief window to still jump just after leaving the ground
+    if (run.onGround) run.coyote = 6; else if (run.coyote > 0) run.coyote--;
+    run.vy += GRAV; run.y += run.vy;
+    if (run.y >= run.groundY) {
+      run.y = run.groundY; run.vy = 0;
+      if (!run.onGround) {
+        run.onGround = true;
+        if (run.jumpBuffer > 0) { run.vy = JUMP_V; run.onGround = false; run.jumpBuffer = 0; }
+      }
+    }
+    if (run.jumpBuffer > 0) run.jumpBuffer--;
 
     // dust kicked up on each footfall while grounded
     if (run.onGround) {

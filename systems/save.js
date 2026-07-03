@@ -10,6 +10,7 @@
  */
 
 import { stageFor } from '../data/creatures.js';
+import { defaultAvatar } from '../data/avatar.js';
 
 const KEY = 'cobbies.save.v1';
 
@@ -43,7 +44,8 @@ export function defaultState() {
     coins: 40,
     roster,
     pity: 0,
-    settings: { muted: false },
+    avatar: defaultAvatar(),
+    settings: { muted: false, biome: 'meadow' },
   };
 }
 
@@ -90,6 +92,7 @@ function migrate(s) {
   const state = {
     ...base,
     ...s,
+    avatar: { ...base.avatar, ...(s.avatar || {}) },
     settings: { ...base.settings, ...(s.settings || {}) },
   };
   if (!Array.isArray(state.roster) || state.roster.length === 0) {

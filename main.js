@@ -11,12 +11,15 @@ import { CRITTERS, PALS, EVO_XP, RARITY, HATCH_POOL, stageFor } from './data/cre
 import { drawPix, drawCentered } from './render/pixel.js';
 import { lineFor } from './data/dialogue.js';
 import * as Save from './systems/save.js';
-import { createFarm } from './systems/farm.js';
+import { createFarm, AVATAR_KEY } from './systems/farm.js';
 import { createRunner } from './systems/run.js';
 import {
   hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
 } from './systems/hatch.js';
-import { renderRoster, renderDex, renderCard, displayName } from './ui/screens.js';
+import {
+  renderRoster, renderDex, renderCard, renderScenes, displayName,
+  renderAvatarEditor, drawAvatarPreview,
+} from './ui/screens.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -25,7 +28,11 @@ let state = Save.load();
 const persist = () => Save.save(state);
 
 /* ---------- systems ---------- */
-const farm = createFarm($('farm'), () => state, showCardFor);
+const farm = createFarm($('farm'), () => state, onFarmTap);
+function onFarmTap(key) {
+  if (key === AVATAR_KEY) openAvatar();
+  else showCardFor(key);
+}
 const runner = createRunner($('run'), onRunDistance, onRunEnd);
 window.addEventListener('resize', () => { farm.resize(); runner.resize(); });
 
@@ -66,24 +73,26 @@ function submitName() {
    the player by name. Nora is weighted to speak most often.
    ============================================================ */
 let dialogueTimer = 0;
+let dialogueIdx = 0;
 function scheduleDialogue() {
   clearTimeout(dialogueTimer);
   if (!runActive) showDialogue();
-  dialogueTimer = setTimeout(scheduleDialogue, 9000);
+  dialogueTimer = setTimeout(scheduleDialogue, 10000);
 }
 function showDialogue() {
   const bubble = $('dialogue');
-  // Nora speaks ~half the time; else a random owned critter.
-  const owned = state.roster.map((r) => r.key);
-  const key = Math.random() < 0.5 || !owned.length ? 'nora' : owned[(Math.random() * owned.length) | 0];
-  const cd = CRITTERS[key];
-  const owner = state.roster.find((r) => r.key === key) || state.roster[0];
+  const roster = state.roster;
+  if (!roster.length) return;
+  // Round-robin through every captured cobbie so they all get a turn.
+  const owner = roster[dialogueIdx % roster.length];
+  dialogueIdx = (dialogueIdx + 1) % roster.length;
+  const cd = CRITTERS[owner.key];
   const ctx = $('dlgCanvas').getContext('2d');
   ctx.clearRect(0, 0, 48, 48);
-  drawPix(ctx, cd.stages[owner ? owner.stage : 0], PALS[cd.type], 0, 0, 3);
-  $('dlgText').textContent = lineFor(key, state.playerName);
+  drawPix(ctx, cd.stages[owner.stage], PALS[cd.type], 0, 0, 3);
+  $('dlgText').textContent = lineFor(owner.key, state.playerName);
   bubble.classList.add('show');
-  setTimeout(() => bubble.classList.remove('show'), 6000);
+  setTimeout(() => bubble.classList.remove('show'), 8500);
 }
 
 /* ============================================================
@@ -311,6 +320,34 @@ function openDex() {
   $('dexScreen').classList.add('show');
 }
 
+/* ---------- avatar creator ---------- */
+$('avatarbtn').addEventListener('click', openAvatar);
+$('avatarBack').addEventListener('click', () => $('avatarScreen').classList.remove('show'));
+$('avatarDone').addEventListener('click', () => $('avatarScreen').classList.remove('show'));
+function openAvatar() {
+  const refresh = () => {
+    persist();
+    drawAvatarPreview($('avatarPreview'), state.avatar);
+    renderAvatarEditor($('avatarOptions'), state.avatar, refresh);
+  };
+  drawAvatarPreview($('avatarPreview'), state.avatar);
+  renderAvatarEditor($('avatarOptions'), state.avatar, refresh);
+  $('avatarScreen').classList.add('show');
+}
+
+/* ---------- scene / biome picker ---------- */
+$('scenebtn').addEventListener('click', openScenes);
+$('sceneBack').addEventListener('click', () => $('sceneScreen').classList.remove('show'));
+function pickScene(key) {
+  state.settings.biome = key;
+  persist();
+  renderScenes($('sceneGrid'), state.settings.biome, pickScene); // refresh highlight
+}
+function openScenes() {
+  renderScenes($('sceneGrid'), state.settings.biome, pickScene);
+  $('sceneScreen').classList.add('show');
+}
+
 function showCardFor(key) {
   const owned = state.roster.find((r) => r.key === key);
   if (!owned) return;
@@ -320,17 +357,30 @@ function showCardFor(key) {
 }
 let cardKey = null;
 $('cardClose').addEventListener('click', () => $('card').classList.remove('show'));
+
+// Rename via an in-app modal (prompt() is blocked inside embedded/iframe hosts).
 $('cardRename').addEventListener('click', () => {
   const owned = state.roster.find((r) => r.key === cardKey);
   if (!owned) return;
-  const next = prompt('Name this creature:', displayName(owned));
-  if (next && next.trim()) {
-    owned.nickname = next.trim().toUpperCase().slice(0, 14);
+  $('renameInput').value = displayName(owned);
+  $('renameModal').classList.add('show');
+  $('renameInput').focus();
+  $('renameInput').select();
+});
+function commitRename() {
+  const owned = state.roster.find((r) => r.key === cardKey);
+  const v = $('renameInput').value.trim().toUpperCase().slice(0, 14);
+  $('renameModal').classList.remove('show');
+  if (owned && v) {
+    owned.nickname = v;
     persist();
     renderCard($('card'), owned);
     farm.sync();
   }
-});
+}
+$('renameSave').addEventListener('click', commitRename);
+$('renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') commitRename(); });
+$('renameCancel').addEventListener('click', () => $('renameModal').classList.remove('show'));
 
 /* ---------- go ---------- */
 boot();

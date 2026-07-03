@@ -5,6 +5,8 @@
  */
 
 import { CRITTERS, PALS, EVO_XP, RARITY, HATCH_POOL } from '../data/creatures.js';
+import { BIOMES } from '../data/biomes.js';
+import { AVATAR_OPTIONS, drawAvatar } from '../data/avatar.js';
 import { drawPix, drawCentered } from '../render/pixel.js';
 
 /** Display name for an owned creature (nickname overrides the default). */
@@ -89,6 +91,89 @@ function drawSilhouette(ctx, grid, ox, oy, cell) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('?', ox + 24, oy + 24);
+}
+
+/** Redraw the avatar preview canvas from a selection. */
+export function drawAvatarPreview(canvas, sel) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawAvatar(ctx, sel, 0, 0, canvas.width / 16);
+}
+
+/**
+ * Build the avatar editor option rows. Calls onChange(sel) after every pick.
+ * @param {HTMLElement} container
+ * @param {object} sel   avatar selection (mutated in place)
+ * @param {() => void} onChange
+ */
+export function renderAvatarEditor(container, sel, onChange) {
+  container.innerHTML = '';
+  const O = AVATAR_OPTIONS;
+
+  const colorRow = (label, field, list) => {
+    const row = document.createElement('div');
+    row.className = 'av-row';
+    row.innerHTML = `<span class="av-label">${label}</span>`;
+    const opts = document.createElement('div');
+    opts.className = 'av-opts';
+    list.forEach((item, i) => {
+      const sw = document.createElement('button');
+      sw.className = 'av-sw' + (sel[field] === i ? ' on' : '');
+      sw.style.background = item.c || '#3a4653';
+      if (!item.c) sw.textContent = '∅';
+      sw.title = item.name;
+      sw.addEventListener('click', () => { sel[field] = i; onChange(); });
+      opts.appendChild(sw);
+    });
+    row.appendChild(opts);
+    container.appendChild(row);
+  };
+
+  const textRow = (label, field, names) => {
+    const row = document.createElement('div');
+    row.className = 'av-row';
+    row.innerHTML = `<span class="av-label">${label}</span>`;
+    const opts = document.createElement('div');
+    opts.className = 'av-opts';
+    names.forEach((name, i) => {
+      const b = document.createElement('button');
+      b.className = 'av-chip' + (sel[field] === i ? ' on' : '');
+      b.textContent = name.toUpperCase();
+      b.addEventListener('click', () => { sel[field] = i; onChange(); });
+      opts.appendChild(b);
+    });
+    row.appendChild(opts);
+    container.appendChild(row);
+  };
+
+  colorRow('SKIN', 'skin', O.skins);
+  textRow('HAIR', 'hairStyle', O.hairStyles);
+  colorRow('COLOR', 'hairColor', O.hairColors);
+  colorRow('OUTFIT', 'outfit', O.outfits);
+  textRow('HAT', 'hat', O.hats.map((h) => h.name));
+}
+
+/**
+ * Scene / biome picker. One swatch card per biome, current one highlighted.
+ * @param {HTMLElement} container
+ * @param {string} current   currently selected biome key
+ * @param {(key:string)=>void} onPick
+ */
+export function renderScenes(container, current, onPick) {
+  container.innerHTML = '';
+  for (const key of Object.keys(BIOMES)) {
+    const b = BIOMES[key];
+    const cell = document.createElement('div');
+    cell.className = 'scell' + (key === current ? ' active' : '');
+    cell.innerHTML = `
+      <div class="sswatch" style="background:linear-gradient(180deg,${b.sky[0]},${b.horizon} 62%,${b.ground})">
+        <span class="stile" style="background:${b.tileA.top}"></span>
+        <span class="stile" style="background:${b.tileB.top}"></span>
+      </div>
+      <div class="sname">${b.emoji} ${b.name}</div>`;
+    container.appendChild(cell);
+    cell.addEventListener('click', () => onPick(key));
+  }
 }
 
 /**
