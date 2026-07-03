@@ -49,6 +49,26 @@ export function renderRoster(container, roster, onPick) {
 }
 
 /**
+ * The Pen: your current collection (owned critters only). A 🏠 badge marks
+ * the ones shown on the home ranch. Tap a critter to open its card.
+ */
+export function renderCollection(container, state, onPick) {
+  container.innerHTML = '';
+  const home = new Set(state.homeCritters || []);
+  for (const r of state.roster) {
+    const cd = CRITTERS[r.key];
+    const cell = document.createElement('div');
+    cell.className = 'dcell';
+    cell.innerHTML = `<canvas width="48" height="48"></canvas>
+      <div class="dname">${displayName(r)}</div>
+      ${home.has(r.key) ? '<div class="home-badge">🏠</div>' : ''}`;
+    container.appendChild(cell);
+    drawPix(cell.querySelector('canvas').getContext('2d'), cd.stages[r.stage], PALS[cd.type], 0, 0, 3);
+    cell.addEventListener('click', () => onPick(r.key));
+  }
+}
+
+/**
  * Collection / dex. Every species in a grid: owned shown in colour, locked
  * shown as a silhouette with a "?" so players know what's left to catch.
  * @param {HTMLElement} container

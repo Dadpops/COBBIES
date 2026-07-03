@@ -7,7 +7,7 @@
  *       spend coins to hatch → repeat. Every action shows visible progress.
  */
 
-import { CRITTERS, PALS, EVO_XP, RARITY, HATCH_POOL, stageFor } from './data/creatures.js';
+import { CRITTERS, PALS, EVO_XP, RARITY, HATCH_POOL, TOTAL_SPECIES, stageFor } from './data/creatures.js';
 import { drawPix, drawCentered } from './render/pixel.js';
 import { lineFor } from './data/dialogue.js';
 import * as Save from './systems/save.js';
@@ -22,10 +22,10 @@ import {
 } from './systems/hatch.js';
 import {
   STATIONS, totalAccrued, collectAll, collectOne, assign as assignStation,
-  unassign as unassignStation, stationOf, expand as expandRanch, isFull,
+  unassign as unassignStation, stationOf, expand as expandRanch, expandCost, isFull,
 } from './systems/idle.js';
 import {
-  renderRoster, renderDex, renderCard, renderScenes, displayName,
+  renderRoster, renderCollection, renderCard, renderScenes, displayName,
   renderAvatarEditor, drawAvatarPreview, renderStations, renderPicker,
 } from './ui/screens.js';
 
@@ -36,10 +36,19 @@ let state = Save.load();
 const persist = () => Save.save(state);
 
 /* ---------- systems ---------- */
-const farm = createFarm($('farm'), () => state, onFarmTap);
+const farm = createFarm($('farm'), () => state, onFarmTap, onBuilding);
 function onFarmTap(key) {
   if (key === AVATAR_KEY) openAvatar();
   else showCardFor(key);
+}
+// Tapping a building on the ranch map opens its area.
+function onBuilding(id) {
+  if (id === 'barn') openJobs();
+  else if (id === 'nest') openHatchMenu();
+  else if (id === 'pen') openCollection();
+  else if (id === 'play') openHub();
+  else if (id === 'wardrobe') openAvatar();
+  else if (id === 'shop') openShop();
 }
 const runner = createRunner($('run'), onRunDistance, onRunEnd, onRunClear);
 const music = createMusic();
@@ -70,10 +79,10 @@ window.addEventListener('resize', () => { farm.resize(); runner.resize(); whack.
    ============================================================ */
 let runActive = false;
 function enterMinigame() {
-  $('farmbtns').style.display = 'none';
   document.querySelector('.topbar').style.display = 'none';
   $('dialogue').classList.remove('show');
   $('dailyBanner').style.display = 'none';
+  $('maphint').style.display = 'none';
   runActive = true;
   startBuddy();
   sfx.resume();
@@ -81,9 +90,9 @@ function enterMinigame() {
   music.setIntensity(0);           // ramps up as the match goes on
 }
 function exitMinigame() {
-  $('farmbtns').style.display = 'flex';
   document.querySelector('.topbar').style.display = '';
   $('dailyBanner').style.display = '';
+  $('maphint').style.display = '';
   runActive = false;
   stopBuddy();
   music.setIntensity(0);           // calm again on the farm — music keeps playing
@@ -109,7 +118,6 @@ window.addEventListener('pointerdown', startMusicOnce, { once: false });
 /* ---------- coin display ---------- */
 function syncCoins() {
   $('coinCount').textContent = state.coins;
-  $('hatchbtn').disabled = state.coins < EGG_COST;
 }
 
 /* ============================================================
@@ -175,7 +183,6 @@ function showDialogue() {
    MINIGAME HUB — PLAY opens a picker (Runner / Whack) with the
    cheerleader-buddy selector and a music toggle.
    ============================================================ */
-$('playbtn').addEventListener('click', openHub);
 $('hubBack').addEventListener('click', () => $('hubScreen').classList.remove('show'));
 function openHub() {
   updateHubBuddyName();
@@ -282,7 +289,6 @@ function chipRow(label, names, sel, onPick) {
    RANCH JOBS (idle) — station critters to earn coins over time,
    expand the ranch to hold more critters.
    ============================================================ */
-$('jobsbtn').addEventListener('click', openJobs);
 $('jobsBack').addEventListener('click', () => $('jobsScreen').classList.remove('show'));
 function jobsHandlers() {
   return {
@@ -290,9 +296,9 @@ function jobsHandlers() {
       const st = STATIONS.find((s) => s.id === id);
       openPicker('STATION AT ' + st.name.toUpperCase(),
         (key) => stationOf(state, key) === id,
-        (key) => { assignStation(state, id, key, Date.now()); persist(); $('pickerScreen').classList.remove('show'); refreshJobs(); });
+        (key) => { assignStation(state, id, key, Date.now()); persist(); farm.sync(); $('pickerScreen').classList.remove('show'); refreshJobs(); });
     },
-    onUnassign: (id) => { unassignStation(state, id, Date.now()); persist(); syncCoins(); refreshJobs(); },
+    onUnassign: (id) => { unassignStation(state, id, Date.now()); persist(); syncCoins(); farm.sync(); refreshJobs(); },
     onCollect: (id) => { if (collectOne(state, id, Date.now())) { persist(); syncCoins(); beep(() => sfx.coin()); } refreshJobs(); },
     onExpand: () => { if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); refreshJobs(); } },
   };
@@ -485,7 +491,6 @@ $('evoDone').addEventListener('click', () => $('evolve').classList.remove('show'
 /* ============================================================
    HATCHERY — random egg vs direct buy (Section 9 decision).
    ============================================================ */
-$('hatchbtn').addEventListener('click', openHatchMenu);
 $('hatchMenuBack').addEventListener('click', () => $('hatchMenu').classList.remove('show'));
 
 function remainingToFind() {
@@ -619,7 +624,11 @@ function revealHatch(result) {
   if (result.pityTriggered) {
     tag.innerHTML += `<div class="hpity">✦ PITY REWARD ✦</div>`;
   }
-  if (!result.isDupe) { addProgress(state, 'hatch', 1); persist(); renderDailyBanner(); }
+  if (!result.isDupe) {
+    addProgress(state, 'hatch', 1);
+    if (state.homeCritters.length < 10) state.homeCritters.push(result.key); // show new friend at home
+    persist(); renderDailyBanner();
+  }
   farm.sync();
   $('hatchReveal').classList.add('show');
   $('hatchDone').style.display = 'block';
@@ -629,18 +638,14 @@ $('hatchDone').addEventListener('click', () => $('hatch').classList.remove('show
 /* ============================================================
    COLLECTION (DEX) + CHARACTER CARD
    ============================================================ */
-$('dexbtn').addEventListener('click', openDex);
 $('dexBack').addEventListener('click', () => $('dexScreen').classList.remove('show'));
-function openDex() {
-  const total = 1 + HATCH_POOL.filter((k) => k !== 'nora').length;
-  const have = new Set(state.roster.map((r) => r.key)).size;
-  $('dexCount').textContent = `${have} / ${total} COLLECTED`;
-  renderDex($('dexGrid'), state, showCardFor);
+function openCollection() {
+  $('dexCount').textContent = `${state.roster.length} / ${TOTAL_SPECIES} COLLECTED · 🏠 = on farm`;
+  renderCollection($('dexGrid'), state, showCardFor);
   $('dexScreen').classList.add('show');
 }
 
-/* ---------- avatar creator ---------- */
-$('avatarbtn').addEventListener('click', openAvatar);
+/* ---------- wardrobe (avatar creator) ---------- */
 $('avatarBack').addEventListener('click', () => $('avatarScreen').classList.remove('show'));
 $('avatarDone').addEventListener('click', () => $('avatarScreen').classList.remove('show'));
 function openAvatar() {
@@ -672,10 +677,62 @@ function showCardFor(key) {
   if (!owned) return;
   cardKey = key;
   renderCard($('card'), owned);
+  updateCardHome();
   $('card').classList.add('show');
 }
 let cardKey = null;
 $('cardClose').addEventListener('click', () => $('card').classList.remove('show'));
+
+// Toggle whether this critter appears on the home ranch (max 10).
+$('cardHome').addEventListener('click', () => {
+  if (!cardKey) return;
+  const home = state.homeCritters;
+  const idx = home.indexOf(cardKey);
+  if (idx >= 0) home.splice(idx, 1);
+  else if (home.length >= 10) { toast('Home ranch is full (10) — remove one first.'); return; }
+  else home.push(cardKey);
+  persist(); farm.sync(); updateCardHome();
+  if ($('dexScreen').classList.contains('show')) renderCollection($('dexGrid'), state, showCardFor);
+});
+function updateCardHome() {
+  const on = state.homeCritters.includes(cardKey);
+  const btn = $('cardHome');
+  btn.textContent = on ? '🏠 ON FARM ✓' : '🏠 ADD TO FARM';
+  btn.classList.toggle('on', on);
+}
+
+/* ---------- shop ---------- */
+$('shopBack').addEventListener('click', () => $('shopScreen').classList.remove('show'));
+function openShop() { renderShop(); $('shopScreen').classList.add('show'); }
+function renderShop() {
+  const body = $('shopBody');
+  body.innerHTML = '';
+  const cost = expandCost(state.capacity);
+  body.appendChild(shopItem('🏡', 'Ranch Expansion', `+2 space · now ${state.roster.length}/${state.capacity}`,
+    `${cost} 🪙`, state.coins >= cost, () => {
+      if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); renderShop(); }
+    }));
+  body.appendChild(shopItemSoon('🎩', 'Critter Cosmetics', 'Hats & accessories for your critters'));
+  body.appendChild(shopItemSoon('🖼️', 'More Backgrounds', 'New home scenes to unlock'));
+  body.appendChild(shopItemSoon('👕', 'Avatar Items', 'More looks in the Wardrobe'));
+}
+function shopItem(emoji, title, desc, price, enabled, onBuy) {
+  const el = document.createElement('div');
+  el.className = 'shop-item';
+  el.innerHTML = `<span class="shop-emoji">${emoji}</span>
+    <div class="shop-info"><b>${title}</b><span>${desc}</span></div>
+    <button class="shop-buy" ${enabled ? '' : 'disabled'}>${price}</button>`;
+  el.querySelector('.shop-buy').addEventListener('click', onBuy);
+  return el;
+}
+function shopItemSoon(emoji, title, desc) {
+  const el = document.createElement('div');
+  el.className = 'shop-item soon';
+  el.innerHTML = `<span class="shop-emoji">${emoji}</span>
+    <div class="shop-info"><b>${title}</b><span>${desc}</span></div>
+    <button class="shop-buy" disabled>SOON</button>`;
+  return el;
+}
 
 // Rename via an in-app modal (prompt() is blocked inside embedded/iframe hosts).
 $('cardRename').addEventListener('click', () => {

@@ -45,6 +45,7 @@ export function defaultState() {
     roster,
     pity: 0,
     capacity: 8,   // ranch starts small; expand it with idle coins
+    homeCritters: roster.map((r) => r.key), // which critters wander the home farm (max 10)
     avatar: defaultAvatar(),
     buddy: 'nora',
     daily: null,   // filled in by ensureDaily() on boot
@@ -105,6 +106,11 @@ function migrate(s) {
   }
   // never strand an existing collection: capacity is at least what they hold
   state.capacity = Math.max(s.capacity ?? 8, state.roster.length);
+  // home critters: keep valid owned keys, default to the first 10 owned
+  const ownedKeys = new Set(state.roster.map((r) => r.key));
+  let home = Array.isArray(s.homeCritters) ? s.homeCritters.filter((k) => ownedKeys.has(k)) : null;
+  if (!home || !home.length) home = state.roster.slice(0, 10).map((r) => r.key);
+  state.homeCritters = home.slice(0, 10);
   state.roster = state.roster.map((r) => ({
     key: r.key,
     xp: r.xp | 0,

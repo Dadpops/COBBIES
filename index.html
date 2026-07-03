@@ -14,7 +14,6 @@
   <div class="topbar">
     <span class="title">COBBIES</span>
     <div class="top-right">
-      <button class="iconbtn" id="avatarbtn" title="Your avatar">🧑</button>
       <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
       <button class="iconbtn" id="settingsbtn" title="Settings">⚙️</button>
       <span class="pill" id="coinPill">🪙 <b id="coinCount">0</b></span>
@@ -40,12 +39,7 @@
     <canvas id="buddyCanvas" width="48" height="48"></canvas>
   </div>
 
-  <div id="farmbtns">
-    <button class="btn ghost" id="dexbtn">📖 DEX</button>
-    <button class="btn ghost" id="jobsbtn">🧰 JOBS</button>
-    <button class="btn sec" id="hatchbtn">🥚 HATCH</button>
-    <button class="btn" id="playbtn">▶ PLAY</button>
-  </div>
+  <div id="maphint" class="maphint">Tap a building to visit it</div>
 
   <!-- NAME ENTRY (first launch) -->
   <div class="screen center" id="nameScreen">
@@ -54,6 +48,14 @@
     <p class="intro">Welcome to the ranch. What should I call you?</p>
     <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
     <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen center" id="shopScreen">
+    <button class="backbtn" id="shopBack">‹</button>
+    <h2>SHOP</h2>
+    <p class="intro">Spend your coins to grow the ranch.</p>
+    <div id="shopBody"></div>
   </div>
 
   <!-- JOBS / IDLE STATIONS -->
@@ -202,6 +204,7 @@
       <div class="card-xp">0 XP</div>
       <div class="card-flavor">—</div>
       <div class="card-actions">
+        <button class="btn sec" id="cardHome">🏠 ON FARM</button>
         <button class="btn ghost" id="cardRename">✏ NICKNAME</button>
         <button class="btn" id="cardClose">CLOSE</button>
       </div>
