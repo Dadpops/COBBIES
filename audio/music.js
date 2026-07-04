@@ -14,6 +14,9 @@ export const TRACKS = [
   { name: 'DUSK',   root: 174, scale: [0, 3, 5, 7, 10], pattern: [0, 2, 4, 3, 2, 1, 3, 2], wave: 'sine',     padWave: 'sine',     cutoff: 1100, slow: 0.56, fast: 0.34 },
   { name: 'ARCADE', root: 262, scale: [0, 2, 4, 5, 7],  pattern: [0, 1, 2, 3, 4, 3, 2, 1], wave: 'square',   padWave: 'triangle', cutoff: 2200, slow: 0.42, fast: 0.24 },
   { name: 'LO-FI',  root: 196, scale: [0, 3, 5, 7, 10], pattern: [0, 4, 2, 5, 3, 2, 4, 1], wave: 'triangle', padWave: 'sine',     cutoff: 900,  slow: 0.62, fast: 0.42 },
+  // A warmer, more melodic lo-fi tune — a 7-note dorian scale + a longer,
+  // wandering phrase and a muffled cutoff make it feel distinct from the rest.
+  { name: 'COZY',   root: 155.56, scale: [0, 2, 3, 5, 7, 9, 10], pattern: [0, 2, 4, 3, 5, 4, 6, 4, 3, 1, 2, 4, 3, 2, 0, 4], wave: 'sine', padWave: 'triangle', cutoff: 860, slow: 0.60, fast: 0.40 },
 ];
 
 export function createMusic() {

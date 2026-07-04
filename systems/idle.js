@@ -36,6 +36,15 @@ export function totalAccrued(state, now) {
   return STATIONS.reduce((sum, st) => sum + accruedFor(state, st.id, now), 0);
 }
 
+/** Current passive income rate in coins/hour across all stationed critters. */
+export function incomeRate(state) {
+  return STATIONS.reduce((sum, st) => {
+    const s = state.stations[st.id];
+    const cr = s && s.key ? state.roster.find((r) => r.key === s.key) : null;
+    return cr ? sum + rateFor(st, cr) : sum;
+  }, 0);
+}
+
 export function collectOne(state, id, now) {
   const c = accruedFor(state, id, now);
   if (c > 0) { state.coins += c; state.stations[id].since = now; }

@@ -25,7 +25,14 @@ export function createRhythm(canvas, opts) {
     hitY = H * 0.78; vy = hitY / FALL_TIME;
   }
 
-  function interval() { return 0.85 - 0.4 * Math.min(1, elapsed / DURATION); } // tempo quickens
+  // Beat spacing: an overall quickening PLUS a section that changes every ~4s
+  // (normal → fast burst → slow), so the pace you tap at keeps shifting.
+  function interval() {
+    const p = Math.min(1, elapsed / DURATION);
+    const base = 0.78 - 0.30 * p;
+    const factor = [1.0, 0.62, 1.35][Math.floor(elapsed / 4) % 3];
+    return base * factor;
+  }
 
   const laneX = () => W * 0.5;
 
@@ -120,6 +127,7 @@ export function createRhythm(canvas, opts) {
       const mult = 1 + Math.floor(combo / 10);
       score += (perfect ? 2 : 1) * mult;
       feedback = perfect ? 'Perfect' : 'Good'; fbT = 0.5;
+      opts.onHit && opts.onHit(combo);
       const r = canvas.getBoundingClientRect();
       opts.onScore && opts.onScore(r.left + laneX() * (r.width / W), r.top + hitY * (r.height / H));
     } else {

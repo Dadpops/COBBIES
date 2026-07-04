@@ -53,7 +53,8 @@ export function defaultState() {
     dailies: null, // filled in by ensureDaily() on boot (one challenge per minigame)
     stations: { berry: { key: null, since: 0 }, pond: { key: null, since: 0 }, lookout: { key: null, since: 0 } },
     stats: { games: 0, whackHits: 0, hatches: 0, runBest: 0, whackBest: 0, // lifetime counters for goals
-      catchHits: 0, fishHits: 0, rhythmHits: 0, catchBest: 0, fishBest: 0, rhythmBest: 0 },
+      catchHits: 0, fishHits: 0, rhythmHits: 0, catchBest: 0, fishBest: 0, rhythmBest: 0,
+      coinsEarned: 0 }, // lifetime gross coins earned (Town Board)
     hammer: 'wood',           // equipped whack mallet skin
     ownedHammers: ['wood'],   // unlocked mallet skins (default is free)
     ownedHats: [],            // hats bought in the shop
