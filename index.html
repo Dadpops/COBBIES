@@ -39,6 +39,7 @@
   <div class="topbar">
     <span class="title">COBBIES</span>
     <div class="top-right">
+      <button class="iconbtn" id="townbtn" title="Town Board">🏛️</button>
       <button class="iconbtn" id="challengesbtn" title="Challenges">⭐</button>
       <button class="iconbtn" id="scenebtn" title="Change scene">🗺️</button>
       <button class="iconbtn" id="helpbtn" title="How to play">❓</button>
@@ -90,6 +91,20 @@
     <p class="intro">Welcome to the ranch. What should I call you?</p>
     <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
     <button class="btn" id="nameGo">LET'S GO</button>
+  </div>
+
+  <!-- TOWN BOARD -->
+  <div class="screen" id="townScreen">
+    <button class="backbtn" id="townBack">‹</button>
+    <h2>TOWN BOARD</h2>
+    <div class="chal-scroll">
+      <div class="town-level" id="townLevel">🏛️ TOWN LEVEL 1</div>
+      <div class="ranch-info" id="townNext"></div>
+      <div class="goals-head">📊 STATS</div>
+      <div id="townStats"></div>
+      <div class="goals-head">🏅 BEST RECORDS</div>
+      <div id="townRecords"></div>
+    </div>
   </div>
 
   <!-- CHALLENGES -->
@@ -242,9 +257,7 @@
     <button class="backbtn" id="hatchMenuBack">‹</button>
     <h2>THE HATCHERY</h2>
     <p class="intro" id="pityHint">A random egg could be anyone…</p>
-    <button class="btn sec" id="eggRandom">🥚 RANDOM EGG · 50</button>
-    <button class="btn ghost" id="eggDirect">🎯 PICK A CRITTER · 150</button>
-    <div id="directList" class="direct-list"></div>
+    <button class="btn sec" id="eggRandom">🥚 RANDOM EGG · 90</button>
   </div>
 
   <!-- HATCH REVEAL -->
@@ -266,6 +279,15 @@
     <div class="hname" id="evoName">—</div>
     <div class="evo-transition" id="evoTransition">—</div>
     <button class="btn" id="evoDone">WONDERFUL!</button>
+  </div>
+
+  <!-- TOWN LEVEL UP (dedicated reveal moment) -->
+  <div id="townup">
+    <div class="htitle">TOWN LEVEL UP!</div>
+    <canvas id="townupCanvas" width="120" height="120"></canvas>
+    <div class="hname" id="townupName">—</div>
+    <div class="evo-transition" id="townupText">—</div>
+    <button class="btn" id="townupDone">WONDERFUL!</button>
   </div>
 
   <!-- RESULTS -->

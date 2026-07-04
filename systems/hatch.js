@@ -14,7 +14,7 @@
 
 import { CRITTERS, HATCH_POOL, RARITY, stageFor } from '../data/creatures.js';
 
-export const EGG_COST = 50;
+export const EGG_COST = 90;
 export const DIRECT_COST = 150;
 export const DUPE_XP = 40;
 export const PITY_LIMIT = 10; // random eggs without a legendary -> forced

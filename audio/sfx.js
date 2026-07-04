@@ -88,5 +88,25 @@ export function createSfx() {
       const g = c.createGain(); env(g, t, 0.003, 0.16, 0.2);
       o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.22);
     },
+
+    // A sparkly ascending arpeggio + shimmer — the moment an egg hatches.
+    hatchChime() {
+      const c = ensure(); if (!c) return; const t = c.currentTime;
+      const base = 523.25; // C5
+      [0, 4, 7, 12].forEach((s, i) => tone('triangle', base * Math.pow(2, s / 12), 0, t + i * 0.09, 0.5, 0.09));
+      tone('sine', base * 2, base * 3, t + 0.42, 0.5, 0.05);   // shimmer up
+      tone('sine', base * Math.pow(2, 16 / 12), 0, t + 0.42, 0.6, 0.06);
+    },
+
+    // A triumphant rising run into a bright chord — a critter evolving.
+    evolveFanfare() {
+      const c = ensure(); if (!c) return; const t = c.currentTime;
+      const base = 392; // G4
+      const run = [0, 2, 4, 7, 9];
+      run.forEach((s, i) => tone('square', base * Math.pow(2, s / 12), 0, t + i * 0.08, 0.32, 0.08));
+      const chord = t + run.length * 0.08;
+      [0, 4, 7, 12].forEach((s) => tone('triangle', base * Math.pow(2, (s + 12) / 12), 0, chord, 0.7, 0.07));
+      tone('sine', base * 4, base * 5, chord, 0.6, 0.04); // sparkle over the chord
+    },
   };
 }

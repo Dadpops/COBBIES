@@ -18,17 +18,18 @@ import { createCatch } from './systems/catch.js';
 import { createFishing } from './systems/fishing.js';
 import { createRhythm } from './systems/rhythm.js';
 import { createMusic, TRACKS } from './audio/music.js';
+import { createRhythmMusic } from './audio/rhythm-music.js';
 import { createSfx } from './audio/sfx.js';
 import { HAT_LIST, HATS } from './data/cosmetics.js';
 import { drawCritter, drawCritterCentered } from './render/critter.js';
 import { GOALS, goalProgress, goalDone, goalClaimed, rewardText, claimGoal, anyGoalClaimable } from './systems/quests.js';
 import { ensureDaily, getDailies, addProgress, claim as claimDaily, anyDailyClaimable } from './systems/daily.js';
 import {
-  hatchEgg, directBuy, EGG_COST, DIRECT_COST, PITY_LIMIT,
+  hatchEgg, EGG_COST, PITY_LIMIT,
 } from './systems/hatch.js';
 import {
   STATIONS, totalAccrued, collectAll, collectOne, assign as assignStation,
-  unassign as unassignStation, stationOf, expand as expandRanch, expandCost, isFull,
+  unassign as unassignStation, stationOf, expand as expandRanch, expandCost, isFull, incomeRate,
 } from './systems/idle.js';
 import { applyRanchLevel, ranchTier, nextRanchTier, ranchLevelFor } from './systems/ranch.js';
 import { HAMMERS, HAMMER_LIST, drawHammer } from './data/hammers.js';
@@ -45,6 +46,8 @@ const $ = (id) => document.getElementById(id);
 /* ---------- state ---------- */
 let state = Save.load();
 const persist = () => Save.save(state);
+// Add coins AND record them toward lifetime gross earnings (Town Board).
+function gainCoins(n) { state.coins += n; state.stats.coinsEarned = (state.stats.coinsEarned || 0) + n; }
 
 /* ---------- systems ---------- */
 const farm = createFarm($('farm'), () => state, onFarmTap, onBuilding);
@@ -62,11 +65,12 @@ function onBuilding(id) {
 }
 const runner = createRunner($('run'), onRunDistance, onRunEnd, onRunClear);
 const music = createMusic();
+const rhythmMusic = createRhythmMusic();
 const sfx = createSfx();
 const beep = (fn) => { if (state.settings.musicOn) fn(); };
 const whack = createWhack($('whack'), {
   getState: () => state,
-  onScore: (x, y) => { beep(() => sfx.squeak()); beep(() => sfx.coin()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'whackHits', 1); },
+  onScore: (x, y) => { beep(() => sfx.squeak()); floatPop(x, y, '+3 🪙', 'coin'); addProgress(state, 'whackHits', 1); }, // squeak only — no coin ding
   onBomb: (x, y) => { beep(() => sfx.bomb()); floatPop(x, y, '✗', 'x'); },
   onIntensity: (p) => music.setIntensity(Math.min(0.7, p * 0.55)), // gentle
   onEnd: (score) => endWhack(score),
@@ -88,9 +92,11 @@ const fishGame = createFishing($('fishing'), {
 });
 const rhythmGame = createRhythm($('rhythm'), {
   getState: () => state,
-  onScore: (x, y) => { beep(() => sfx.coin()); floatPop(x, y, '♪', 'coin'); addProgress(state, 'rhythmHits', 1); },
-  onMiss: () => beep(() => sfx.error()),
-  onIntensity: gameIntensity,
+  onScore: (x, y) => { floatPop(x, y, '♪', 'coin'); addProgress(state, 'rhythmHits', 1); }, // the beat blip is the audio feedback
+  onHit: (combo) => beep(() => rhythmMusic.hit(combo)), // kick + bass land on your taps; melody keeps going
+  onMiss: () => beep(() => rhythmMusic.miss()), // a miss ducks the melody out for a beat
+  onBeat: () => {}, // (bass is driven by hits now, not note spawns)
+  onIntensity: () => {}, // rhythm has its own music; ambient intensity unused here
   onEnd: (score) => endRhythm(score),
 });
 
@@ -129,9 +135,15 @@ function exitMinigame() {
   $('playBig').style.display = '';
   runActive = false;
   stopBuddy();
+  if (rhythmMusicOn) {              // hand the soundtrack back to the ambient track
+    rhythmMusic.stop();
+    rhythmMusicOn = false;
+    if (state.settings.musicOn) music.start();
+  }
   music.setIntensity(0);           // calm again on the farm — music keeps playing
   renderChallenges();
 }
+let rhythmMusicOn = false;
 
 /* ---------- music: plays across the whole game once started ---------- */
 let musicStarted = false;
@@ -163,7 +175,7 @@ function boot() {
   applyRanchLevel(state); // reconcile ranch level with the collection (grants any owed bonus)
   // idle earnings collected while away
   const away = totalAccrued(state, Date.now());
-  if (away > 0) { collectAll(state, Date.now()); toast(`🧺 Your ranch earned ${away} 🪙 while you were away!`); }
+  if (away > 0) { collectAll(state, Date.now()); state.stats.coinsEarned = (state.stats.coinsEarned || 0) + away; toast(`🧺 Your ranch earned ${away} 🪙 while you were away!`); }
   persist();
   renderChallenges();
   syncCoins();
@@ -318,7 +330,7 @@ function jobsHandlers() {
         (key) => { assignStation(state, id, key, Date.now()); persist(); farm.sync(); $('pickerScreen').classList.remove('show'); refreshJobs(); });
     },
     onUnassign: (id) => { unassignStation(state, id, Date.now()); persist(); syncCoins(); farm.sync(); refreshJobs(); },
-    onCollect: (id) => { if (collectOne(state, id, Date.now())) { persist(); syncCoins(); beep(() => sfx.coin()); } refreshJobs(); },
+    onCollect: (id) => { const c = collectOne(state, id, Date.now()); if (c) { state.stats.coinsEarned = (state.stats.coinsEarned || 0) + c; persist(); syncCoins(); beep(() => sfx.coin()); } refreshJobs(); },
     onExpand: () => { if (expandRanch(state)) { persist(); syncCoins(); beep(() => sfx.coin()); refreshJobs(); } },
   };
 }
@@ -407,7 +419,7 @@ function onRunDistance(d) {
 }
 // Each cleared obstacle: a coin, a ding, and a floating popup.
 function onRunClear(px, py) {
-  state.coins += 3;
+  gainCoins(3);
   addProgress(state, 'coins', 3);
   syncCoins();
   beep(() => sfx.coin());
@@ -471,7 +483,7 @@ $('resContinue').addEventListener('click', () => {
 // Shared results/reward flow for a finished minigame round.
 function finishMinigame(idx, o) {
   const r = state.roster[idx] || state.roster[0];
-  state.coins += o.coins;
+  gainCoins(o.coins);
   const before = r.stage;
   r.xp += o.xp;
   const after = stageFor(r.xp);
@@ -517,7 +529,16 @@ function endFishing(score) {
   finishMinigame(fishIdx, { title: 'REEL IN!', statHTML: `<b>${score}</b> fish`,
     coins: score * 6, xp: score * 6, totalKey: 'fishHits', bestKey: 'fishBest', score });
 }
-function startRhythmWith(idx) { rhythmIdx = idx; launchGame(rhythmGame, 'rhythm', idx); }
+function startRhythmWith(idx) {
+  rhythmIdx = idx;
+  launchGame(rhythmGame, 'rhythm', idx);
+  if (state.settings.musicOn) {     // silence the ambient track, play the beat track instead
+    music.stop();
+    rhythmMusic.setVolume(state.settings.volume);
+    rhythmMusic.start();
+    rhythmMusicOn = true;
+  }
+}
 function endRhythm(score) {
   finishMinigame(rhythmIdx, { title: 'ENCORE!', statHTML: `<b>${score}</b> points`,
     coins: score * 2, xp: score * 3, totalKey: 'rhythmHits', bestKey: 'rhythmBest', score });
@@ -540,7 +561,7 @@ function startWhackWith(idx) {
 function endWhack(score) {
   const coins = score * 3;
   const xp = score * 4;
-  state.coins += coins;
+  gainCoins(coins);
   const r = state.roster[whackIdx] || state.roster[0];
   const before = r.stage;
   r.xp += xp;
@@ -601,22 +622,51 @@ function stopBuddy() {
 }
 
 /* ============================================================
-   EVOLUTION — a dedicated reveal moment (mirrors the hatch beat).
+   REVEAL ANIMATION — an accelerating white-flash build-up on the old
+   look, a bright burst, then the new look fades in. Shared by the
+   evolution reveal and the town level-up so both feel momentous.
+   ============================================================ */
+let flashTimer = 0;
+function flashReveal(canvas, drawOld, drawNew, onReveal) {
+  clearTimeout(flashTimer);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const whiteout = (a) => { ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.restore(); };
+  // blink intervals shrink as it builds toward the reveal (accelerating)
+  const delays = [300, 270, 240, 210, 185, 160, 135, 115, 98, 84, 72, 62, 54, 48];
+  let i = 0;
+  function build() {
+    ctx.clearRect(0, 0, W, H);
+    drawOld(ctx);
+    if (i % 2 === 1) whiteout(0.22 + 0.62 * (i / delays.length)); // brighter flashes near the end
+    if (i < delays.length) { flashTimer = setTimeout(build, delays[i]); i++; }
+    else { if (onReveal) onReveal(); burst(1); }   // the "pop": fire sound + start the burst
+  }
+  function burst(a) {
+    ctx.clearRect(0, 0, W, H);
+    drawNew(ctx);
+    whiteout(a);
+    if (a > 0) flashTimer = setTimeout(() => burst(a - 0.1), 45);
+    else { ctx.clearRect(0, 0, W, H); drawNew(ctx); }
+  }
+  build();
+}
+
+/* ============================================================
+   EVOLUTION — a dedicated reveal moment with a dramatic build-up.
    ============================================================ */
 function showEvolution({ key, before, after }) {
   const cd = CRITTERS[key];
   const r = state.roster.find((x) => x.key === key);
-  const ctx = $('evoCanvas').getContext('2d');
-  ctx.clearRect(0, 0, 120, 120);
-  // brief flash of the old stage, then settle on the new one
-  drawCentered(ctx, cd.stages[before], PALS[cd.type], 120, 7);
   $('evoName').textContent = displayName(r);
   $('evoTransition').textContent = `${cd.stageNames[before]} → ${cd.stageNames[after]}`;
   $('evolve').classList.add('show');
-  setTimeout(() => {
-    ctx.clearRect(0, 0, 120, 120);
-    drawCentered(ctx, cd.stages[after], PALS[cd.type], 120, 7);
-  }, 700);
+  flashReveal(
+    $('evoCanvas'),
+    (ctx) => drawCentered(ctx, cd.stages[before], PALS[cd.type], 120, 7),
+    (ctx) => drawCentered(ctx, cd.stages[after], PALS[cd.type], 120, 7),
+    () => beep(() => sfx.evolveFanfare()),
+  );
 }
 $('evoDone').addEventListener('click', () => $('evolve').classList.remove('show'));
 
@@ -636,11 +686,7 @@ function lockedRemaining() {
 function openHatchMenu() {
   updatePityHint();
   $('eggRandom').disabled = state.coins < EGG_COST || remainingToFind() === 0 || isFull(state);
-  $('eggDirect').disabled = state.coins < DIRECT_COST;
   $('eggRandom').textContent = `🥚 RANDOM EGG · ${EGG_COST}`;
-  $('eggDirect').textContent = `🎯 PICK A CRITTER · ${DIRECT_COST}`;
-  $('directList').classList.remove('show');
-  $('directList').innerHTML = '';
   $('hatchMenu').classList.add('show');
 }
 function updatePityHint() {
@@ -671,33 +717,6 @@ $('eggRandom').addEventListener('click', () => {
   playHatchAnimation(result);
 });
 
-$('eggDirect').addEventListener('click', () => {
-  const list = $('directList');
-  if (list.classList.contains('show')) { list.classList.remove('show'); return; }
-  list.innerHTML = '';
-  const ownedKeys = new Set(state.roster.map((r) => r.key));
-  const unlocked = HATCH_POOL.filter((k) => (CRITTERS[k].unlockAt ?? 8) <= state.capacity);
-  for (const key of unlocked) {
-    const cd = CRITTERS[key];
-    const owned = ownedKeys.has(key);
-    const row = document.createElement('div');
-    row.className = 'direct-row' + (owned ? ' owned' : '');
-    row.innerHTML = `<canvas width="40" height="40"></canvas>
-      <span class="drname">${cd.name}</span>
-      <span class="drtag" style="color:${RARITY[cd.rarity].color}">${owned ? 'OWNED · +XP' : RARITY[cd.rarity].label}</span>`;
-    list.appendChild(row);
-    drawPix(row.querySelector('canvas').getContext('2d'), cd.stages[0], PALS[cd.type], -4, -4, 3);
-    row.addEventListener('click', () => {
-      if (!owned && isFull(state)) { toast('Ranch is full — expand it in Jobs!'); return; }
-      const result = directBuy(state, key);
-      if (!result) return;
-      persist(); syncCoins();
-      $('hatchMenu').classList.remove('show');
-      playHatchAnimation(result);
-    });
-  }
-  list.classList.add('show');
-});
 
 /* ---------- egg reveal animation ---------- */
 const EGG_PAL = [null, '#c8a86a', '#f0e0c0', '#fff8e8', '#a88a4a', '#8a6a3a'];
@@ -765,18 +784,39 @@ function revealHatch(result) {
     persist(); renderChallenges();
   }
   farm.sync();
+  beep(() => sfx.hatchChime());
   $('hatchReveal').classList.add('show');
   $('hatchDone').style.display = 'block';
 }
 // A new ranch level is revealed only after the player closes the hatch card,
 // so the two celebratory moments don't stack on top of each other.
 let pendingRanchLevel = null;
+// A round level "coin" badge with the level number — the two "stages" the
+// town level-up flashes between (old level -> new level).
+function drawTownBadge(ctx, level) {
+  ctx.clearRect(0, 0, 120, 120);
+  ctx.fillStyle = '#f0a24a'; ctx.beginPath(); ctx.arc(60, 60, 46, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#fff3d8'; ctx.beginPath(); ctx.arc(60, 60, 37, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#b5654a'; ctx.font = 'bold 46px ui-monospace, monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(level), 60, 64);
+  ctx.fillStyle = '#8a5a2a'; ctx.font = 'bold 10px ui-monospace, monospace';
+  ctx.fillText('LEVEL', 60, 30);
+}
 function celebrateRanchLevel(res) {
   const tier = ranchTier(res.level);
   const capGained = res.gained.reduce((s, t) => s + t.capBonus, 0);
-  beep(() => sfx.coin());
-  toast(`🏡 RANCH LEVEL ${res.level} — ${tier.name}! You unlocked ${tier.adds}${capGained ? ` and +${capGained} ranch space` : ''}.`, 5200);
+  $('townupName').textContent = tier.name;
+  $('townupText').textContent = `You unlocked ${tier.adds}${capGained ? ` · +${capGained} ranch space` : ''}`;
+  $('townup').classList.add('show');
+  flashReveal(
+    $('townupCanvas'),
+    (ctx) => drawTownBadge(ctx, res.from),
+    (ctx) => drawTownBadge(ctx, res.level),
+    () => beep(() => sfx.evolveFanfare()),
+  );
 }
+$('townupDone').addEventListener('click', () => $('townup').classList.remove('show'));
 $('hatchDone').addEventListener('click', () => {
   $('hatch').classList.remove('show');
   if (pendingRanchLevel) { celebrateRanchLevel(pendingRanchLevel); pendingRanchLevel = null; }
@@ -959,6 +999,44 @@ $('renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') com
 $('renameCancel').addEventListener('click', () => $('renameModal').classList.remove('show'));
 
 /* ============================================================
+   TOWN BOARD — a 🏛️ topbar button opens the town overview: level +
+   next-level progress, collection, passive income, total earned, and
+   the best record in each minigame.
+   ============================================================ */
+$('townbtn').addEventListener('click', openTown);
+$('townBack').addEventListener('click', () => $('townScreen').classList.remove('show'));
+function openTown() { renderTown(); $('townScreen').classList.add('show'); }
+function renderTown() {
+  const collected = state.roster.length;
+  const level = ranchLevelFor(collected);
+  const tier = ranchTier(level);
+  const next = nextRanchTier(collected);
+  $('townLevel').textContent = `🏛️ TOWN LEVEL ${level} · ${tier.name}`;
+  const nextEl = $('townNext');
+  if (next) {
+    const pct = Math.round(((collected - tier.need) / (next.need - tier.need)) * 100);
+    nextEl.innerHTML = `Next up — <b>${next.name}</b> at ${next.need} cobbies (${collected}/${next.need})`
+      + `<div class="ri-bar"><div class="ri-fill" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
+  } else {
+    nextEl.innerHTML = 'The whole city is built — every cobbie collected! 🎉';
+  }
+  const rows = (list) => list.map(([k, v]) => `<div class="stat-row"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('townStats').innerHTML = rows([
+    ['🐾 Cobbies collected', `${collected} / ${TOTAL_SPECIES}`],
+    ['💤 Passive income', `${incomeRate(state)} 🪙/hr`],
+    ['💰 Total coins earned', `${state.stats.coinsEarned || 0} 🪙`],
+    ['🎮 Games played', `${state.stats.games || 0}`],
+  ]);
+  $('townRecords').innerHTML = rows([
+    ['🏃 Runner · best distance', `${state.stats.runBest || 0} m`],
+    ['🔨 Whack · best bonks', `${state.stats.whackBest || 0}`],
+    ['🧺 Catch · best haul', `${state.stats.catchBest || 0}`],
+    ['🎣 Fishing · best catch', `${state.stats.fishBest || 0}`],
+    ['🎵 Rhythm · best score', `${state.stats.rhythmBest || 0}`],
+  ]);
+}
+
+/* ============================================================
    CHALLENGES — a ⭐ topbar button opens the daily challenge.
    ============================================================ */
 $('playBig').addEventListener('click', openHub);
@@ -1011,13 +1089,14 @@ function renderChallenges() {
 function claimDailyUI(gameId) {
   const reward = claimDaily(state, gameId);
   if (!reward) return;
-  state.coins += reward; persist(); syncCoins(); beep(() => sfx.coin());
+  gainCoins(reward); persist(); syncCoins(); beep(() => sfx.coin());
   toast(`+${reward} 🪙 daily reward!`);
   renderChallenges();
 }
 function claimGoalUI(g) {
   const reward = claimGoal(state, g);
   if (!reward) return;
+  if (reward.type === 'coins') state.stats.coinsEarned = (state.stats.coinsEarned || 0) + reward.amount;
   persist(); syncCoins(); beep(() => sfx.coin());
   toast('Unlocked ' + rewardText(reward) + '!');
   renderChallenges();
